@@ -8,9 +8,6 @@ use crate::output::OutputFormat;
 pub struct Network {
     pub id: String,
     pub display_name: Option<String>,
-    pub name: Option<String>,
-    pub dexes_count: Option<i64>,
-    pub chain: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

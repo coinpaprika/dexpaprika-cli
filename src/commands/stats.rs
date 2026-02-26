@@ -7,7 +7,7 @@ use crate::output::OutputFormat;
 #[derive(Debug, Deserialize, Serialize)]
 pub struct DexStats {
     pub chains: Option<i64>,
-    pub dexes: Option<i64>,
+    pub factories: Option<i64>,
     pub pools: Option<i64>,
     pub tokens: Option<i64>,
 }

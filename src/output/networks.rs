@@ -10,18 +10,12 @@ struct NetworkRow {
     id: String,
     #[tabled(rename = "Name")]
     name: String,
-    #[tabled(rename = "Chain")]
-    chain: String,
-    #[tabled(rename = "DEXes")]
-    dexes: String,
 }
 
 pub fn print_networks_table(networks: &[Network]) {
     let rows: Vec<NetworkRow> = networks.iter().map(|n| NetworkRow {
         id: n.id.clone(),
-        name: n.display_name.clone().or_else(|| n.name.clone()).unwrap_or_else(|| "—".into()),
-        chain: n.chain.clone().unwrap_or_else(|| "—".into()),
-        dexes: n.dexes_count.map(|d| d.to_string()).unwrap_or_else(|| "—".into()),
+        name: n.display_name.clone().unwrap_or_else(|| n.id.clone()),
     }).collect();
 
     let table = Table::new(rows).with(Style::rounded()).to_string();

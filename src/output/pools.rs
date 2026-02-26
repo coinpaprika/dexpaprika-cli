@@ -27,8 +27,8 @@ struct PoolRow {
     price: String,
     #[tabled(rename = "Volume (24h)")]
     volume: String,
-    #[tabled(rename = "Liquidity")]
-    liquidity: String,
+    #[tabled(rename = "24h Change")]
+    change: String,
 }
 
 pub fn print_pools_table(pools: &[PoolListItem]) {
@@ -38,7 +38,7 @@ pub fn print_pools_table(pools: &[PoolListItem]) {
         pair: pool_pair(&p.tokens),
         price: p.price_usd.map(format_price).unwrap_or_else(|| "—".into()),
         volume: p.volume_usd.map(format_usd).unwrap_or_else(|| "—".into()),
-        liquidity: p.liquidity_usd.map(format_usd).unwrap_or_else(|| "—".into()),
+        change: p.last_price_change_usd_24h.map(format_percent).unwrap_or_else(|| "—".into()),
     }).collect();
 
     let table = Table::new(rows).with(Style::rounded()).to_string();
