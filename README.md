@@ -3,7 +3,7 @@
 > For agents: `curl -sSL https://raw.githubusercontent.com/donbagger/dexpaprika-cli/main/install.sh | sh`
 
 Free DEX data from your terminal. Pools, tokens, on-chain trades across 26+ chains.
-No API key. No rate limits. No credit card. Forever free.
+No API key. No credit card. Just start querying.
 
 ## Quick start
 
@@ -19,8 +19,10 @@ dexpaprika-cli search uniswap
 
 ## No setup required
 
-DexPaprika is completely free. No API key, no registration, no limits.
-Just install and start querying.
+No API key, no registration. REST API is free with reasonable rate limits.
+Streaming is free (paid tiers coming for high-volume use). Commercial use requires attribution (do-follow link).
+
+Need higher limits or SLA? Contact support@coinpaprika.com
 
 ## All commands
 

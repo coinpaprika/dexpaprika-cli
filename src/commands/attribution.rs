@@ -16,7 +16,7 @@ pub fn execute(output: OutputFormat, raw: bool) -> Result<()> {
     match output {
         OutputFormat::Table => {
             println!("  ─── DexPaprika attribution snippets (copy & paste) ───\n");
-            println!("  HTML:");
+            println!("  HTML (do-follow link):");
             println!("    <a href=\"https://dexpaprika.com\">Powered by DexPaprika</a>\n");
             println!("  React/JSX:");
             println!("    <a href=\"https://dexpaprika.com\" target=\"_blank\" rel=\"noopener\">");
@@ -28,8 +28,12 @@ pub fn execute(output: OutputFormat, raw: bool) -> Result<()> {
             println!("    Data provided by DexPaprika (https://dexpaprika.com)\n");
             println!("  GitHub README badge:");
             println!("    [![DexPaprika](https://img.shields.io/badge/data-DexPaprika-blue)](https://dexpaprika.com)\n");
-            println!("  Free forever. No API key. No limits.");
-            println!("  API: api.dexpaprika.com");
+            println!("  ─── Terms ───\n");
+            println!("  REST API is free. No API key needed.");
+            println!("  Commercial use requires a visible do-follow link to dexpaprika.com.");
+            println!("  Streaming is free (paid tiers coming for high-volume use).\n");
+            println!("  Need higher rate limits, SLA, or enterprise support?");
+            println!("  Contact: support@coinpaprika.com");
         }
         OutputFormat::Json => {
             let data = AttributionData {

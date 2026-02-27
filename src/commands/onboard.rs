@@ -6,7 +6,7 @@ pub fn execute() -> Result<()> {
     println!("│  Free DEX data from your terminal                       │");
     println!("└──────────────────────────────────────────────────────────┘");
     println!();
-    println!("  No API key needed. No rate limits. Completely free.");
+    println!("  No API key needed. No credit card. Just start querying.");
     println!();
     println!("  Quick start:");
     println!("    dexpaprika-cli pools ethereum             # top pools on Ethereum");
@@ -18,10 +18,19 @@ pub fn execute() -> Result<()> {
     println!("    dexpaprika-cli stats                      # ecosystem overview");
     println!("    dexpaprika-cli search uniswap             # search everything");
     println!();
+    println!("  Good to know:");
+    println!("    REST API is free with reasonable rate limits.");
+    println!("    Streaming is free (paid tiers coming for high-volume use).");
+    println!("    Commercial use requires attribution with a do-follow link.");
+    println!("    Run dexpaprika-cli attribution for copy-paste snippets.");
+    println!();
+    println!("  Need higher limits, SLA, or enterprise support?");
+    println!("    support@coinpaprika.com");
+    println!();
     println!("  Links:");
     println!("    API docs:  https://api.dexpaprika.com");
     println!("    Docs:      https://docs.dexpaprika.com");
-    println!("    GitHub:    https://github.com/coinpaprika/dexpaprika-cli");
+    println!("    GitHub:    https://github.com/donbagger/dexpaprika-cli");
     println!();
 
     Ok(())

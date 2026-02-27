@@ -14,10 +14,12 @@ use std::process::ExitCode;
     about = "dexpaprika-cli — Free DEX data from your terminal",
     long_about = "dexpaprika-cli — Free DEX data from your terminal\n\n\
                    Pools · Tokens · On-chain trades · 26+ chains · Real-time streaming\n\n\
-                   No API key. No rate limits. No credit card. Forever free.\n\n\
+                   REST API: free, no API key needed\n\
+                   Streaming: free (paid tiers coming for high-volume use)\n\n\
                    Quick start:  dexpaprika-cli onboard\n\
                    API docs:     https://api.dexpaprika.com\n\
-                   Docs:         https://docs.dexpaprika.com"
+                   Docs:         https://docs.dexpaprika.com\n\
+                   Enterprise:   support@coinpaprika.com"
 )]
 pub(crate) struct Cli {
     #[command(subcommand)]
