@@ -30,7 +30,7 @@ pub fn execute() -> Result<()> {
     println!("  Links:");
     println!("    API docs:  https://api.dexpaprika.com");
     println!("    Docs:      https://docs.dexpaprika.com");
-    println!("    GitHub:    https://github.com/donbagger/dexpaprika-cli");
+    println!("    GitHub:    https://github.com/coinpaprika/dexpaprika-cli");
     println!();
 
     Ok(())

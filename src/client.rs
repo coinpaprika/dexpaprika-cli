@@ -10,7 +10,7 @@ impl ApiClient {
     pub fn new() -> Self {
         Self {
             http: reqwest::Client::builder()
-                .user_agent("dexpaprika-cli/0.1.0")
+                .user_agent(concat!("dexpaprika-cli/", env!("CARGO_PKG_VERSION")))
                 .build()
                 .expect("failed to build HTTP client"),
             dexpaprika_base: "https://api.dexpaprika.com".to_string(),

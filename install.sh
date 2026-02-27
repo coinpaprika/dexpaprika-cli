@@ -1,13 +1,13 @@
 #!/bin/sh
 # DexPaprika CLI installer
-# Usage: curl -sSL https://raw.githubusercontent.com/donbagger/dexpaprika-cli/main/install.sh | sh
+# Usage: curl -sSL https://raw.githubusercontent.com/coinpaprika/dexpaprika-cli/main/install.sh | sh
 #
 # Detects your OS/arch, downloads the latest release binary from GitHub, and
 # drops it into ~/.local/bin (or /usr/local/bin with sudo).
 
 set -e
 
-REPO="donbagger/dexpaprika-cli"
+REPO="coinpaprika/dexpaprika-cli"
 BINARY="dexpaprika-cli"
 INSTALL_DIR="${DEXPAPRIKA_INSTALL_DIR:-$HOME/.local/bin}"
 

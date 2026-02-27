@@ -1,6 +1,6 @@
 # dexpaprika-cli
 
-> For agents: `curl -sSL https://raw.githubusercontent.com/donbagger/dexpaprika-cli/main/install.sh | sh`
+> For agents: `curl -sSL https://raw.githubusercontent.com/coinpaprika/dexpaprika-cli/main/install.sh | sh`
 
 Free DEX data from your terminal. Pools, tokens, on-chain trades across 26+ chains.
 No API key. No credit card. Just start querying.
@@ -9,7 +9,7 @@ No API key. No credit card. Just start querying.
 
 ```bash
 # Install
-curl -sSL https://raw.githubusercontent.com/donbagger/dexpaprika-cli/main/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/coinpaprika/dexpaprika-cli/main/install.sh | sh
 
 # Try it
 dexpaprika-cli pools ethereum
@@ -78,4 +78,4 @@ dexpaprika-cli --output json --raw pools ethereum
 
 - API docs: https://api.dexpaprika.com
 - Documentation: https://docs.dexpaprika.com
-- GitHub: https://github.com/donbagger/dexpaprika-cli
+- GitHub: https://github.com/coinpaprika/dexpaprika-cli
