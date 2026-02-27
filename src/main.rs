@@ -100,6 +100,12 @@ enum Commands {
         /// Page number (0-indexed)
         #[arg(long, default_value = "0")]
         page: usize,
+        /// Order by field
+        #[arg(long, default_value = "volume_usd")]
+        order_by: String,
+        /// Sort order
+        #[arg(long, default_value = "desc")]
+        sort: String,
     },
 
     /// Get recent transactions for a pool
@@ -246,8 +252,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
         Commands::Pool { network, pool_address, inversed } => {
             commands::pools::execute_pool_detail(&client, &network, &pool_address, inversed, output, raw).await
         }
-        Commands::DexPools { network, dex, limit, page } => {
-            commands::pools::execute_dex_pools(&client, &network, &dex, limit, page, output, raw).await
+        Commands::DexPools { network, dex, limit, page, order_by, sort } => {
+            commands::pools::execute_dex_pools(&client, &network, &dex, limit, page, &order_by, &sort, output, raw).await
         }
         Commands::Transactions { network, pool_address, limit, cursor } => {
             commands::pools::execute_transactions(&client, &network, &pool_address, limit, cursor.as_deref(), output, raw).await

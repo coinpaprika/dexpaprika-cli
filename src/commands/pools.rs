@@ -154,6 +154,8 @@ pub async fn execute_dex_pools(
     dex: &str,
     limit: usize,
     page: usize,
+    order_by: &str,
+    sort: &str,
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
@@ -161,7 +163,7 @@ pub async fn execute_dex_pools(
     let page_str = page.to_string();
     let resp: PoolsResponse = client.dexpaprika_get(
         &format!("/networks/{network}/dexes/{dex}/pools"),
-        &[("limit", &limit_str), ("page", &page_str)],
+        &[("limit", &limit_str), ("page", &page_str), ("order_by", order_by), ("sort", sort)],
     ).await?;
     let pools = resp.pools;
     match output {
@@ -213,6 +215,14 @@ pub async fn execute_ohlcv(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    // Validate start date format
+    let is_unix = start.chars().all(|c| c.is_ascii_digit());
+    let is_date = start.len() == 10 && start.chars().nth(4) == Some('-') && start.chars().nth(7) == Some('-');
+    let is_rfc3339 = start.contains('T');
+    if !is_unix && !is_date && !is_rfc3339 {
+        anyhow::bail!("Invalid --start format: \"{start}\". Use yyyy-mm-dd, unix timestamp, or RFC3339.");
+    }
+
     let limit_str = limit.to_string();
     let mut params: Vec<(&str, &str)> = vec![
         ("start", start),

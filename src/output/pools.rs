@@ -133,7 +133,7 @@ struct OhlcvRow {
 
 pub fn print_pool_ohlcv_table(data: &[PoolOhlcv]) {
     let rows: Vec<OhlcvRow> = data.iter().map(|d| OhlcvRow {
-        date: d.time_open.as_deref().unwrap_or("—").chars().take(10).collect(),
+        date: d.time_open.as_deref().unwrap_or("—").chars().take(19).collect(),
         open: d.open.map(format_price).unwrap_or_else(|| "—".into()),
         high: d.high.map(format_price).unwrap_or_else(|| "—".into()),
         low: d.low.map(format_price).unwrap_or_else(|| "—".into()),

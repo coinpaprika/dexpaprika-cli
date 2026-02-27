@@ -119,6 +119,11 @@ pub async fn execute_prices(client: &ApiClient, network: &str, tokens: &str, out
         &format!("/networks/{network}/multi/prices"),
         &[("tokens", tokens)],
     ).await?;
+
+    if prices.is_empty() {
+        anyhow::bail!("No price data found. Check that the token addresses are valid on {network}.");
+    }
+
     match output {
         OutputFormat::Table => crate::output::tokens::print_prices_table(&prices),
         OutputFormat::Json => {
