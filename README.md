@@ -2,7 +2,7 @@
 
 > For agents: `curl -sSL https://raw.githubusercontent.com/coinpaprika/dexpaprika-cli/main/install.sh | sh`
 
-Free DEX data from your terminal. Pools, tokens, on-chain trades across 26+ chains.
+Free DEX data from your terminal. Pools, tokens, on-chain trades across 33+ chains.
 No API key. No credit card. Just start querying.
 
 ## Quick start

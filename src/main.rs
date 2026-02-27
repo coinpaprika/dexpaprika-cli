@@ -13,7 +13,7 @@ use std::process::ExitCode;
     version,
     about = "dexpaprika-cli — Free DEX data from your terminal",
     long_about = "dexpaprika-cli — Free DEX data from your terminal\n\n\
-                   Pools · Tokens · On-chain trades · 26+ chains · Real-time streaming\n\n\
+                   Pools · Tokens · On-chain trades · 33+ chains · Real-time streaming\n\n\
                    REST API: free, no API key needed\n\
                    Streaming: free (paid tiers coming for high-volume use)\n\n\
                    Quick start:  dexpaprika-cli onboard\n\
