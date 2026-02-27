@@ -189,7 +189,18 @@ enum Commands {
     },
 
     /// Stream real-time token prices via SSE
-    #[command(after_help = "EXAMPLES:\n  dexpaprika-cli stream ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2\n  dexpaprika-cli stream --tokens watchlist.json --limit 100")]
+    #[command(after_help = "EXAMPLES:\n  \
+        dexpaprika-cli stream ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2\n  \
+        dexpaprika-cli stream ethereum 0xc02a... --limit 50\n  \
+        dexpaprika-cli stream --tokens watchlist.json\n\n\
+        WATCHLIST FORMAT (JSON array):\n  \
+        [{\"chain\": \"ethereum\", \"address\": \"0xc02a...\"}, {\"chain\": \"solana\", \"address\": \"JUPy...\"}]\n\n\
+        JSON FIELDS:\n  \
+        address         Token contract address\n  \
+        chain           Network/chain ID\n  \
+        price_usd       Current price in USD\n  \
+        timestamp       Event timestamp (unix)\n  \
+        price_timestamp Price calculation timestamp (unix)")]
     Stream {
         /// Network ID (for single-token stream)
         network: Option<String>,
