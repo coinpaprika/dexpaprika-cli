@@ -48,11 +48,11 @@ enum Commands {
     Dexes {
         /// Network ID (e.g., ethereum, solana, bsc)
         network: String,
-        /// Maximum number of results
+        /// Maximum number of results (max 100)
         #[arg(long, default_value = "10")]
         limit: usize,
-        /// Page number (0-indexed)
-        #[arg(long, default_value = "0")]
+        /// Page number (1-indexed)
+        #[arg(long, default_value = "1")]
         page: usize,
     },
 
@@ -61,11 +61,11 @@ enum Commands {
     Pools {
         /// Network ID (e.g., ethereum, solana)
         network: String,
-        /// Maximum number of results
+        /// Maximum number of results (max 100)
         #[arg(long, default_value = "10")]
         limit: usize,
-        /// Page number (0-indexed)
-        #[arg(long, default_value = "0")]
+        /// Page number (1-indexed)
+        #[arg(long, default_value = "1")]
         page: usize,
         /// Order by field
         #[arg(long, default_value = "volume_usd")]
@@ -73,6 +73,40 @@ enum Commands {
         /// Sort order
         #[arg(long, default_value = "desc")]
         sort: String,
+    },
+
+    /// Filter pools by volume, transactions, and creation date
+    #[command(name = "pool-filter", after_help = "EXAMPLES:\n  dexpaprika-cli pool-filter ethereum --volume-24h-min 100000\n  dexpaprika-cli pool-filter solana --txns-24h-min 500 --sort-by volume_24h")]
+    PoolFilter {
+        /// Network ID (e.g., ethereum, solana)
+        network: String,
+        /// Minimum 24h volume in USD
+        #[arg(long)]
+        volume_24h_min: Option<f64>,
+        /// Maximum 24h volume in USD
+        #[arg(long)]
+        volume_24h_max: Option<f64>,
+        /// Minimum transactions in 24h
+        #[arg(long)]
+        txns_24h_min: Option<u64>,
+        /// Only pools created after this UNIX timestamp
+        #[arg(long)]
+        created_after: Option<u64>,
+        /// Only pools created before this UNIX timestamp
+        #[arg(long)]
+        created_before: Option<u64>,
+        /// Sort by field: volume_24h, txns_24h, created_at
+        #[arg(long, default_value = "volume_24h")]
+        sort_by: String,
+        /// Sort direction: asc or desc
+        #[arg(long, default_value = "desc")]
+        sort_dir: String,
+        /// Maximum number of results (max 100)
+        #[arg(long, default_value = "50")]
+        limit: usize,
+        /// Page number (1-indexed)
+        #[arg(long, default_value = "1")]
+        page: usize,
     },
 
     /// Get detailed info about a specific pool
@@ -94,11 +128,11 @@ enum Commands {
         network: String,
         /// DEX identifier (e.g., uniswap_v3, sushiswap)
         dex: String,
-        /// Maximum number of results
+        /// Maximum number of results (max 100)
         #[arg(long, default_value = "10")]
         limit: usize,
-        /// Page number (0-indexed)
-        #[arg(long, default_value = "0")]
+        /// Page number (1-indexed)
+        #[arg(long, default_value = "1")]
         page: usize,
         /// Order by field
         #[arg(long, default_value = "volume_usd")]
@@ -163,11 +197,11 @@ enum Commands {
         network: String,
         /// Token contract address
         token_address: String,
-        /// Maximum number of results
+        /// Maximum number of results (max 100)
         #[arg(long, default_value = "10")]
         limit: usize,
-        /// Page number (0-indexed)
-        #[arg(long, default_value = "0")]
+        /// Page number (1-indexed)
+        #[arg(long, default_value = "1")]
         page: usize,
         /// Order by field
         #[arg(long, default_value = "volume_usd")]
@@ -175,6 +209,24 @@ enum Commands {
         /// Sort order
         #[arg(long, default_value = "desc")]
         sort: String,
+    },
+
+    /// Discover top tokens on a network by volume (derived from pool data)
+    #[command(name = "top-tokens", after_help = "EXAMPLES:\n  dexpaprika-cli top-tokens solana\n  dexpaprika-cli top-tokens ethereum --limit 10\n  dexpaprika-cli top-tokens solana --pools 100 --limit 30\n\n\
+        HOW IT WORKS:\n  \
+        1. Fetches top pools by volume on the network\n  \
+        2. Extracts unique tokens from those pools\n  \
+        3. Fetches full detail for each token (price, volume, liquidity, buys/sells)\n  \
+        4. Ranks by 24h volume")]
+    TopTokens {
+        /// Network ID (e.g., ethereum, solana, bsc)
+        network: String,
+        /// Number of tokens to display
+        #[arg(long, default_value = "20")]
+        limit: usize,
+        /// Number of pools to scan for token discovery (more = wider coverage)
+        #[arg(long, default_value = "100")]
+        pools: usize,
     },
 
     /// Get batch prices for multiple tokens
@@ -223,6 +275,10 @@ enum Commands {
     /// Check DexPaprika API health status
     Status,
 
+    /// Check for CLI updates (compares with latest GitHub release)
+    #[command(name = "check-update")]
+    CheckUpdate,
+
     /// Get ready-to-paste attribution snippets for DexPaprika
     Attribution,
 
@@ -249,6 +305,9 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
         Commands::Pools { network, limit, page, order_by, sort } => {
             commands::pools::execute_pools(&client, &network, limit, page, &order_by, &sort, output, raw).await
         }
+        Commands::PoolFilter { network, volume_24h_min, volume_24h_max, txns_24h_min, created_after, created_before, sort_by, sort_dir, limit, page } => {
+            commands::pools::execute_pool_filter(&client, &network, volume_24h_min, volume_24h_max, txns_24h_min, created_after, created_before, &sort_by, &sort_dir, limit, page, output, raw).await
+        }
         Commands::Pool { network, pool_address, inversed } => {
             commands::pools::execute_pool_detail(&client, &network, &pool_address, inversed, output, raw).await
         }
@@ -267,6 +326,9 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
         Commands::TokenPools { network, token_address, limit, page, order_by, sort } => {
             commands::tokens::execute_token_pools(&client, &network, &token_address, limit, page, &order_by, &sort, output, raw).await
         }
+        Commands::TopTokens { network, limit, pools } => {
+            commands::tokens::execute_top_tokens(&client, &network, limit, pools, output, raw).await
+        }
         Commands::Prices { network, tokens } => {
             commands::tokens::execute_prices(&client, &network, &tokens, output, raw).await
         }
@@ -275,6 +337,7 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
             commands::stream::execute(&client, network.as_deref(), token_address.as_deref(), tokens.as_deref(), limit, output).await
         }
         Commands::Status => commands::status::execute_status(&client, output, raw).await,
+        Commands::CheckUpdate => commands::version::execute(output, raw).await,
         Commands::Attribution => commands::attribution::execute(output, raw),
         Commands::Shell => {
             shell::run_shell().await;

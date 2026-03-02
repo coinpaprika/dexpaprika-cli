@@ -1,7 +1,7 @@
 use tabled::{Table, Tabled};
 use tabled::settings::Style;
 
-use crate::commands::pools::{PoolListItem, PoolDetail, PoolTransaction, PoolOhlcv};
+use crate::commands::pools::{PoolListItem, PoolFilterItem, PoolDetail, PoolTransaction, PoolOhlcv};
 use crate::output::{detail_field, format_percent, format_price, format_usd, print_dexpaprika_footer, print_detail_table, truncate_address};
 
 fn pool_pair(tokens: &Option<Vec<crate::commands::pools::PoolToken>>) -> String {
@@ -46,18 +46,76 @@ pub fn print_pools_table(pools: &[PoolListItem]) {
     print_dexpaprika_footer();
 }
 
+#[derive(Tabled)]
+struct FilterRow {
+    #[tabled(rename = "Address")]
+    address: String,
+    #[tabled(rename = "DEX")]
+    dex: String,
+    #[tabled(rename = "Volume (24h)")]
+    volume: String,
+    #[tabled(rename = "Liquidity")]
+    liquidity: String,
+    #[tabled(rename = "Txns (24h)")]
+    txns: String,
+    #[tabled(rename = "Created")]
+    created: String,
+}
+
+pub fn print_pool_filter_table(results: &[PoolFilterItem]) {
+    let rows: Vec<FilterRow> = results.iter().map(|r| FilterRow {
+        address: r.address.as_deref().map(truncate_address).unwrap_or_else(|| "—".into()),
+        dex: r.dex_id.clone().unwrap_or_else(|| "—".into()),
+        volume: r.volume_usd_24h.map(format_usd).unwrap_or_else(|| "—".into()),
+        liquidity: r.liquidity_usd.map(format_usd).unwrap_or_else(|| "—".into()),
+        txns: r.txns_24h.map(|t| t.to_string()).unwrap_or_else(|| "—".into()),
+        created: r.created_at.as_deref().map(|s| s.chars().take(10).collect()).unwrap_or_else(|| "—".into()),
+    }).collect();
+
+    let table = Table::new(rows).with(Style::rounded()).to_string();
+    println!("{table}");
+    print_dexpaprika_footer();
+}
+
 pub fn print_pool_detail(pool: &PoolDetail) {
     let mut rows: Vec<[String; 2]> = Vec::new();
     detail_field!(rows, "Pool ID", pool.id.clone().unwrap_or_else(|| "—".into()));
+    detail_field!(rows, "Chain", pool.chain.clone().unwrap_or_else(|| "—".into()));
     detail_field!(rows, "DEX", format!("{} ({})", pool.dex_name.as_deref().unwrap_or("—"), pool.dex_id.as_deref().unwrap_or("—")));
     detail_field!(rows, "Pair", pool_pair(&pool.tokens));
     detail_field!(rows, "Price (USD)", pool.last_price_usd.map(format_price).unwrap_or_else(|| "—".into()));
+
+    if let Some(lp) = pool.last_price {
+        detail_field!(rows, "Price (Native)", format_price(lp));
+    }
+
+    if let Some(fee) = &pool.fee {
+        if let Some(f) = fee.as_f64() {
+            detail_field!(rows, "Fee", format!("{:.4}%", f * 100.0));
+        }
+    }
+
     detail_field!(rows, "Created At", pool.created_at.clone().unwrap_or_else(|| "—".into()));
+
+    if let Some(ps) = &pool.price_stats {
+        detail_field!(rows, "High (24h)", ps.high.map(format_price).unwrap_or_else(|| "—".into()));
+        detail_field!(rows, "Low (24h)", ps.low.map(format_price).unwrap_or_else(|| "—".into()));
+    }
 
     if let Some(h24) = &pool.h24 {
         detail_field!(rows, "Volume (24h)", h24.volume_usd.map(format_usd).unwrap_or_else(|| "—".into()));
         detail_field!(rows, "24h Change", h24.last_price_usd_change.map(format_percent).unwrap_or_else(|| "—".into()));
+        detail_field!(rows, "Buys/Sells (24h)", format!("{}/{}", h24.buys.unwrap_or(0), h24.sells.unwrap_or(0)));
         detail_field!(rows, "Txns (24h)", h24.txns.map(|t| t.to_string()).unwrap_or_else(|| "—".into()));
+    }
+
+    if let Some(h1) = &pool.h1 {
+        detail_field!(rows, "Volume (1h)", h1.volume_usd.map(format_usd).unwrap_or_else(|| "—".into()));
+        detail_field!(rows, "1h Change", h1.last_price_usd_change.map(format_percent).unwrap_or_else(|| "—".into()));
+    }
+
+    if let Some(m5) = &pool.m5 {
+        detail_field!(rows, "5m Change", m5.last_price_usd_change.map(format_percent).unwrap_or_else(|| "—".into()));
     }
 
     if let Some(tokens) = &pool.tokens {

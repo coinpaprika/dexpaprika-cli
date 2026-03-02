@@ -8,9 +8,15 @@ pub struct ApiClient {
 
 impl ApiClient {
     pub fn new() -> Self {
+        let ua = format!(
+            "dexpaprika-cli/{} ({}/{})",
+            env!("CARGO_PKG_VERSION"),
+            std::env::consts::OS,
+            std::env::consts::ARCH,
+        );
         Self {
             http: reqwest::Client::builder()
-                .user_agent(concat!("dexpaprika-cli/", env!("CARGO_PKG_VERSION")))
+                .user_agent(&ua)
                 .build()
                 .expect("failed to build HTTP client"),
             dexpaprika_base: "https://api.dexpaprika.com".to_string(),

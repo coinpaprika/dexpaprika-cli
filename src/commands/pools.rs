@@ -13,18 +13,20 @@ pub struct PoolsResponse {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PoolListItem {
     pub id: Option<String>,
+    pub chain: Option<String>,
     pub dex_id: Option<String>,
     pub dex_name: Option<String>,
-    pub chain: Option<String>,
-    pub tokens: Option<Vec<PoolToken>>,
-    pub price_usd: Option<f64>,
-    pub volume_usd: Option<f64>,
-    pub liquidity_usd: Option<f64>,
-    pub transactions: Option<serde_json::Value>,
-    pub last_price_change_usd_24h: Option<f64>,
-    pub created_at: Option<String>,
     #[serde(default)]
     pub fee: Option<serde_json::Value>,
+    pub created_at: Option<String>,
+    pub created_at_block_number: Option<i64>,
+    pub volume_usd: Option<f64>,
+    pub transactions: Option<serde_json::Value>,
+    pub price_usd: Option<f64>,
+    pub last_price_change_usd_5m: Option<f64>,
+    pub last_price_change_usd_1h: Option<f64>,
+    pub last_price_change_usd_24h: Option<f64>,
+    pub tokens: Option<Vec<PoolToken>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -47,18 +49,40 @@ pub struct PoolDetailPeriod {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct PoolDetailPriceStats {
+    pub high: Option<f64>,
+    pub low: Option<f64>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct PoolDetail {
     pub id: Option<String>,
     pub chain: Option<String>,
     pub dex_id: Option<String>,
     pub dex_name: Option<String>,
-    pub tokens: Option<Vec<PoolToken>>,
-    pub last_price_usd: Option<f64>,
+    pub factory_id: Option<String>,
+    #[serde(default)]
+    pub fee: Option<serde_json::Value>,
     pub created_at: Option<String>,
+    pub created_at_block_number: Option<i64>,
+    pub last_price: Option<f64>,
+    pub last_price_usd: Option<f64>,
+    pub price_time: Option<String>,
+    pub price_stats: Option<PoolDetailPriceStats>,
+    pub token_reserves: Option<serde_json::Value>,
+    pub tokens: Option<Vec<PoolToken>>,
     #[serde(rename = "24h")]
     pub h24: Option<PoolDetailPeriod>,
-    #[serde(flatten)]
-    pub extra: Option<std::collections::HashMap<String, serde_json::Value>>,
+    #[serde(rename = "6h")]
+    pub h6: Option<PoolDetailPeriod>,
+    #[serde(rename = "1h")]
+    pub h1: Option<PoolDetailPeriod>,
+    #[serde(rename = "30m")]
+    pub m30: Option<PoolDetailPeriod>,
+    #[serde(rename = "15m")]
+    pub m15: Option<PoolDetailPeriod>,
+    #[serde(rename = "5m")]
+    pub m5: Option<PoolDetailPeriod>,
 }
 
 /// Wrapper for paginated transaction responses
@@ -95,6 +119,77 @@ pub struct PoolOhlcv {
     pub low: Option<f64>,
     pub close: Option<f64>,
     pub volume: Option<f64>,
+}
+
+/// Wrapper for pool filter responses (uses "results" key, not "pools")
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PoolFilterResponse {
+    pub results: Vec<PoolFilterItem>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PoolFilterItem {
+    pub address: Option<String>,
+    pub chain: Option<String>,
+    pub dex_id: Option<String>,
+    pub volume_usd_24h: Option<f64>,
+    pub liquidity_usd: Option<f64>,
+    pub txns_24h: Option<i64>,
+    pub created_at: Option<String>,
+}
+
+pub async fn execute_pool_filter(
+    client: &ApiClient,
+    network: &str,
+    volume_24h_min: Option<f64>,
+    volume_24h_max: Option<f64>,
+    txns_24h_min: Option<u64>,
+    created_after: Option<u64>,
+    created_before: Option<u64>,
+    sort_by: &str,
+    sort_dir: &str,
+    limit: usize,
+    page: usize,
+    output: OutputFormat,
+    raw: bool,
+) -> Result<()> {
+    let limit_str = limit.to_string();
+    let page_str = page.to_string();
+    let mut params: Vec<(&str, String)> = vec![
+        ("limit", limit_str),
+        ("page", page_str),
+        ("sort_by", sort_by.to_string()),
+        ("sort_dir", sort_dir.to_string()),
+    ];
+    if let Some(v) = volume_24h_min {
+        params.push(("volume_24h_min", v.to_string()));
+    }
+    if let Some(v) = volume_24h_max {
+        params.push(("volume_24h_max", v.to_string()));
+    }
+    if let Some(v) = txns_24h_min {
+        params.push(("txns_24h_min", v.to_string()));
+    }
+    if let Some(v) = created_after {
+        params.push(("created_after", v.to_string()));
+    }
+    if let Some(v) = created_before {
+        params.push(("created_before", v.to_string()));
+    }
+
+    let param_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+    let resp: PoolFilterResponse = client.dexpaprika_get(
+        &format!("/networks/{network}/pools/filter"),
+        &param_refs,
+    ).await?;
+    let results = resp.results;
+    match output {
+        OutputFormat::Table => crate::output::pools::print_pool_filter_table(&results),
+        OutputFormat::Json => {
+            crate::output::print_json_wrapped(&results, crate::output::ResponseMeta::dexpaprika(&format!("/network/{network}/pools/filter")), raw)?;
+        }
+    }
+    Ok(())
 }
 
 pub async fn execute_pools(

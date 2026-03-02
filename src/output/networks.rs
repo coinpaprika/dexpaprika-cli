@@ -2,7 +2,7 @@ use tabled::{Table, Tabled};
 use tabled::settings::Style;
 
 use crate::commands::networks::{Network, Dex};
-use crate::output::{format_usd, print_dexpaprika_footer};
+use crate::output::print_dexpaprika_footer;
 
 #[derive(Tabled)]
 struct NetworkRow {
@@ -29,21 +29,18 @@ struct DexRow {
     id: String,
     #[tabled(rename = "Name")]
     name: String,
+    #[tabled(rename = "Chain")]
+    chain: String,
     #[tabled(rename = "Protocol")]
     protocol: String,
-    #[tabled(rename = "Pools")]
-    pools: String,
-    #[tabled(rename = "Volume (USD)")]
-    volume: String,
 }
 
 pub fn print_dexes_table(dexes: &[Dex]) {
     let rows: Vec<DexRow> = dexes.iter().map(|d| DexRow {
         id: d.dex_id.clone().unwrap_or_else(|| "—".into()),
         name: d.dex_name.clone().unwrap_or_else(|| "—".into()),
+        chain: d.chain.clone().unwrap_or_else(|| "—".into()),
         protocol: d.protocol.clone().unwrap_or_else(|| "—".into()),
-        pools: d.pools_count.map(|p| p.to_string()).unwrap_or_else(|| "—".into()),
-        volume: d.volume_usd.map(format_usd).unwrap_or_else(|| "—".into()),
     }).collect();
 
     let table = Table::new(rows).with(Style::rounded()).to_string();

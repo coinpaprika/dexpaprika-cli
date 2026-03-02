@@ -14,6 +14,20 @@ curl -sSL https://raw.githubusercontent.com/coinpaprika/dexpaprika-cli/main/inst
 
 After install, use `--output json --raw` for machine-readable output. Run `dexpaprika-cli onboard` for an interactive quick-start guide.
 
+**First step:** Check you're running the latest version:
+```bash
+dexpaprika-cli check-update
+```
+
+### Top tokens on a network (hot tokens, trending, etc.)
+```bash
+dexpaprika-cli top-tokens solana --limit 20 --output json --raw
+dexpaprika-cli top-tokens ethereum --limit 10
+```
+This discovers tokens by scanning top pools by volume, then fetches full detail for each unique token. Use this for "top tokens", "trending tokens", "hot tokens today" type queries.
+
+**IMPORTANT: There is NO `/networks/{network}/tokens` listing endpoint.** Do NOT try to call it — it will 404. To discover tokens on a network, use `top-tokens`, `search`, or `pools` (which contain token info in each pool).
+
 ### Get token price
 ```bash
 dexpaprika-cli token ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --output json --raw
@@ -32,6 +46,11 @@ dexpaprika-cli pool-ohlcv ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --
 ### Top pools on a network
 ```bash
 dexpaprika-cli pools ethereum --limit 10 --output json --raw
+```
+
+### Filter pools by criteria
+```bash
+dexpaprika-cli pool-filter ethereum --volume-24h-min 1000000 --limit 20 --output json --raw
 ```
 
 ### Batch token prices
@@ -66,12 +85,15 @@ Can't install binaries? Use the REST API directly. No auth, no setup.
 | Token price + data        | `GET /networks/{network}/tokens/{token_address}`            |
 | Pool OHLCV (charts)       | `GET /networks/{network}/pools/{pool_address}/ohlcv`        |
 | Top pools on network      | `GET /networks/{network}/pools`                             |
+| Filter pools by criteria  | `GET /networks/{network}/pools/filter`                      |
 | Pools for specific DEX    | `GET /networks/{network}/dexes/{dex}/pools`                 |
 | Single pool details       | `GET /networks/{network}/pools/{pool_address}`              |
 | Pool transactions         | `GET /networks/{network}/pools/{pool_address}/transactions` |
 | Pools containing token    | `GET /networks/{network}/tokens/{token_address}/pools`      |
 | Batch token prices        | `GET /networks/{network}/multi/prices?tokens={addresses}`   |
 | Search tokens/pools/DEXes | `GET /search?query={term}`                                  |
+
+**WARNING:** There is NO `GET /networks/{network}/tokens` endpoint. Do not call it. Use `search`, pool data, or the CLI `top-tokens` command to discover tokens.
 
 ### Python: Get token price
 ```python
@@ -122,7 +144,7 @@ OHLCV params: `start` (required), `end`, `limit` (max 366), `interval` (`1m`|`5m
 
 ### Pagination
 
-All list endpoints: `?page=0&limit=10&order_by=volume_usd&sort=desc`
+All list endpoints: `?page=1&limit=10&order_by=volume_usd&sort=desc` (pages are **1-indexed**, max limit is 100)
 
 ### Streaming (real-time prices)
 
@@ -147,7 +169,9 @@ Chain IDs are **lowercase**. Common: `ethereum`, `solana`, `polygon`, `arbitrum`
 
 ## Troubleshooting
 
+- **Check CLI version:** `dexpaprika-cli check-update` — always run latest
 - **Check API health:** `dexpaprika-cli status` or `GET https://api.dexpaprika.com/stats`
 - **HTTP errors:** `200` OK | `400` bad params | `404` not found | `500` server error
+- **"Top tokens" or "trending tokens":** Use `dexpaprika-cli top-tokens <network>` — there is NO token listing endpoint
 - **This skill doesn't cover your use case?** Fetch the full docs at <https://docs.dexpaprika.com>
 - **Still stuck?** Contact support@coinpaprika.com

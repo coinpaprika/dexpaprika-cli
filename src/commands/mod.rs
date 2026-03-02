@@ -5,5 +5,6 @@ pub mod tokens;
 pub mod search;
 pub mod stream;
 pub mod status;
+pub mod version;
 pub mod attribution;
 pub mod onboard;

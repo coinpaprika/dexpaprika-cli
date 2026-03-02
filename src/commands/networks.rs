@@ -21,9 +21,6 @@ pub struct Dex {
     pub dex_name: Option<String>,
     pub chain: Option<String>,
     pub protocol: Option<String>,
-    pub pools_count: Option<i64>,
-    pub volume_usd: Option<f64>,
-    pub liquidity_usd: Option<f64>,
 }
 
 pub async fn execute_networks(client: &ApiClient, output: OutputFormat, raw: bool) -> Result<()> {
