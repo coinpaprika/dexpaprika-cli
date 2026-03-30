@@ -1,7 +1,7 @@
 use tabled::{Table, Tabled};
 use tabled::settings::Style;
 
-use crate::commands::tokens::{TokenDetail, TopTokenEntry, TokenPoolItem, TokenPrice};
+use crate::commands::tokens::{TokenDetail, TokenFilterResult, TopTokenEntry, TokenPoolItem, TokenPrice};
 use crate::output::{detail_field, format_percent, format_price, format_usd, print_dexpaprika_footer, print_detail_table, truncate_address};
 
 pub fn print_token_detail(token: &TokenDetail) {
@@ -141,6 +141,42 @@ struct PriceRow {
     chain: String,
     #[tabled(rename = "Price (USD)")]
     price: String,
+}
+
+// --- Token filter table ---
+
+#[derive(Tabled)]
+struct TokenFilterRow {
+    #[tabled(rename = "Address")]
+    address: String,
+    #[tabled(rename = "Chain")]
+    chain: String,
+    #[tabled(rename = "Price")]
+    price: String,
+    #[tabled(rename = "Volume (24h)")]
+    volume_24h: String,
+    #[tabled(rename = "Liquidity")]
+    liquidity: String,
+    #[tabled(rename = "FDV")]
+    fdv: String,
+    #[tabled(rename = "Txns (24h)")]
+    txns: String,
+}
+
+pub fn print_token_filter_table(tokens: &[TokenFilterResult]) {
+    let rows: Vec<TokenFilterRow> = tokens.iter().map(|t| TokenFilterRow {
+        address: t.address.as_deref().map(truncate_address).unwrap_or_else(|| "—".into()),
+        chain: t.chain.clone().unwrap_or_else(|| "—".into()),
+        price: t.price_usd.map(format_price).unwrap_or_else(|| "—".into()),
+        volume_24h: t.volume_usd_24h.map(format_usd).unwrap_or_else(|| "—".into()),
+        liquidity: t.liquidity_usd.map(format_usd).unwrap_or_else(|| "—".into()),
+        fdv: t.fdv_usd.map(format_usd).unwrap_or_else(|| "—".into()),
+        txns: t.txns_24h.map(|n| n.to_string()).unwrap_or_else(|| "—".into()),
+    }).collect();
+
+    let table = Table::new(rows).with(Style::rounded()).to_string();
+    println!("{table}");
+    print_dexpaprika_footer();
 }
 
 pub fn print_prices_table(prices: &[TokenPrice]) {

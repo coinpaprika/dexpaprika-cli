@@ -8,6 +8,9 @@ use crate::output::OutputFormat;
 pub struct Network {
     pub id: String,
     pub display_name: Option<String>,
+    pub volume_usd_24h: Option<f64>,
+    pub txns_24h: Option<i64>,
+    pub pools_count: Option<i64>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -21,6 +24,9 @@ pub struct Dex {
     pub dex_name: Option<String>,
     pub chain: Option<String>,
     pub protocol: Option<String>,
+    pub volume_usd_24h: Option<f64>,
+    pub txns_24h: Option<i64>,
+    pub pools_count: Option<i64>,
 }
 
 pub async fn execute_networks(client: &ApiClient, output: OutputFormat, raw: bool) -> Result<()> {

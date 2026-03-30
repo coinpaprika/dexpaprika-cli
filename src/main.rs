@@ -211,6 +211,49 @@ enum Commands {
         sort: String,
     },
 
+    /// Filter tokens on a network by volume, liquidity, FDV, txns, creation date
+    #[command(name = "filter-tokens", after_help = "EXAMPLES:\n  dexpaprika-cli filter-tokens ethereum --volume-24h-min 100000\n  dexpaprika-cli filter-tokens solana --fdv-min 1000000 --sort-by liquidity_usd")]
+    FilterTokens {
+        /// Network ID (e.g., ethereum, solana)
+        network: String,
+        /// Maximum number of results (max 100)
+        #[arg(long, default_value = "10")]
+        limit: usize,
+        /// Page number (1-indexed)
+        #[arg(long, default_value = "1")]
+        page: usize,
+        /// Sort by field (volume_24h, volume_7d, liquidity_usd, txns_24h, created_at, fdv)
+        #[arg(long, default_value = "volume_24h")]
+        sort_by: String,
+        /// Sort direction (asc, desc)
+        #[arg(long, default_value = "desc")]
+        sort_dir: String,
+        /// Minimum 24h volume in USD
+        #[arg(long)]
+        volume_24h_min: Option<f64>,
+        /// Maximum 24h volume in USD
+        #[arg(long)]
+        volume_24h_max: Option<f64>,
+        /// Minimum liquidity in USD
+        #[arg(long)]
+        liquidity_usd_min: Option<f64>,
+        /// Minimum FDV in USD
+        #[arg(long)]
+        fdv_min: Option<f64>,
+        /// Maximum FDV in USD
+        #[arg(long)]
+        fdv_max: Option<f64>,
+        /// Minimum transactions in last 24h
+        #[arg(long)]
+        txns_24h_min: Option<u64>,
+        /// Only tokens created after this UNIX timestamp
+        #[arg(long)]
+        created_after: Option<u64>,
+        /// Only tokens created before this UNIX timestamp
+        #[arg(long)]
+        created_before: Option<u64>,
+    },
+
     /// Discover top tokens on a network by volume (derived from pool data)
     #[command(name = "top-tokens", after_help = "EXAMPLES:\n  dexpaprika-cli top-tokens solana\n  dexpaprika-cli top-tokens ethereum --limit 10\n  dexpaprika-cli top-tokens solana --pools 100 --limit 30\n\n\
         HOW IT WORKS:\n  \
@@ -325,6 +368,9 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
         }
         Commands::TokenPools { network, token_address, limit, page, order_by, sort } => {
             commands::tokens::execute_token_pools(&client, &network, &token_address, limit, page, &order_by, &sort, output, raw).await
+        }
+        Commands::FilterTokens { network, limit, page, sort_by, sort_dir, volume_24h_min, volume_24h_max, liquidity_usd_min, fdv_min, fdv_max, txns_24h_min, created_after, created_before } => {
+            commands::tokens::execute_filter_tokens(&client, &network, limit, page, &sort_by, &sort_dir, volume_24h_min, volume_24h_max, liquidity_usd_min, fdv_min, fdv_max, txns_24h_min, created_after, created_before, output, raw).await
         }
         Commands::TopTokens { network, limit, pools } => {
             commands::tokens::execute_top_tokens(&client, &network, limit, pools, output, raw).await

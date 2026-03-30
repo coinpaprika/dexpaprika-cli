@@ -102,6 +102,35 @@ pub struct TokenPrice {
     pub price_usd: Option<f64>,
 }
 
+// --- Token filter types (for GET /networks/{network}/tokens/filter) ---
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TokenFilterResponse {
+    pub results: Vec<TokenFilterResult>,
+    pub page_info: Option<PageInfo>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TokenFilterResult {
+    pub chain: Option<String>,
+    pub address: Option<String>,
+    pub price_usd: Option<f64>,
+    pub volume_usd_24h: Option<f64>,
+    pub volume_usd_7d: Option<f64>,
+    pub liquidity_usd: Option<f64>,
+    pub fdv_usd: Option<f64>,
+    pub txns_24h: Option<i64>,
+    pub created_at: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PageInfo {
+    pub limit: Option<i64>,
+    pub page: Option<i64>,
+    pub total_items: Option<i64>,
+    pub total_pages: Option<i64>,
+}
+
 /// Summary of a token for the top-tokens ranking (derived from full TokenDetail)
 #[derive(Debug, Serialize)]
 pub struct TopTokenEntry {
@@ -280,6 +309,64 @@ pub async fn execute_prices(client: &ApiClient, network: &str, tokens: &str, out
         OutputFormat::Table => crate::output::tokens::print_prices_table(&prices),
         OutputFormat::Json => {
             crate::output::print_json_wrapped(&prices, crate::output::ResponseMeta::dexpaprika(&format!("/network/{network}/prices")), raw)?;
+        }
+    }
+    Ok(())
+}
+
+pub async fn execute_filter_tokens(
+    client: &ApiClient,
+    network: &str,
+    limit: usize,
+    page: usize,
+    sort_by: &str,
+    sort_dir: &str,
+    volume_24h_min: Option<f64>,
+    volume_24h_max: Option<f64>,
+    liquidity_usd_min: Option<f64>,
+    fdv_min: Option<f64>,
+    fdv_max: Option<f64>,
+    txns_24h_min: Option<u64>,
+    created_after: Option<u64>,
+    created_before: Option<u64>,
+    output: OutputFormat,
+    raw: bool,
+) -> Result<()> {
+    let limit_str = limit.to_string();
+    let page_str = page.to_string();
+
+    let mut params: Vec<(&str, String)> = vec![
+        ("limit", limit_str),
+        ("page", page_str),
+        ("sort_by", sort_by.to_string()),
+        ("sort_dir", sort_dir.to_string()),
+    ];
+    if let Some(v) = volume_24h_min { params.push(("volume_24h_min", v.to_string())); }
+    if let Some(v) = volume_24h_max { params.push(("volume_24h_max", v.to_string())); }
+    if let Some(v) = liquidity_usd_min { params.push(("liquidity_usd_min", v.to_string())); }
+    if let Some(v) = fdv_min { params.push(("fdv_min", v.to_string())); }
+    if let Some(v) = fdv_max { params.push(("fdv_max", v.to_string())); }
+    if let Some(v) = txns_24h_min { params.push(("txns_24h_min", v.to_string())); }
+    if let Some(v) = created_after { params.push(("created_after", v.to_string())); }
+    if let Some(v) = created_before { params.push(("created_before", v.to_string())); }
+
+    let param_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+
+    let resp: TokenFilterResponse = client.dexpaprika_get(
+        &format!("/networks/{network}/tokens/filter"),
+        &param_refs,
+    ).await?;
+
+    match output {
+        OutputFormat::Table => {
+            crate::output::tokens::print_token_filter_table(&resp.results);
+            if let Some(pi) = &resp.page_info {
+                println!("  Page {}/{} ({} tokens total)",
+                    pi.page.unwrap_or(0), pi.total_pages.unwrap_or(0), pi.total_items.unwrap_or(0));
+            }
+        }
+        OutputFormat::Json => {
+            crate::output::print_json_wrapped(&resp, crate::output::ResponseMeta::dexpaprika(&format!("/networks/{network}/tokens/filter")), raw)?;
         }
     }
     Ok(())
