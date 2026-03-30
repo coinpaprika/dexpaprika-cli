@@ -254,22 +254,23 @@ enum Commands {
         created_before: Option<u64>,
     },
 
-    /// Discover top tokens on a network by volume (derived from pool data)
-    #[command(name = "top-tokens", after_help = "EXAMPLES:\n  dexpaprika-cli top-tokens solana\n  dexpaprika-cli top-tokens ethereum --limit 10\n  dexpaprika-cli top-tokens solana --pools 100 --limit 30\n\n\
-        HOW IT WORKS:\n  \
-        1. Fetches top pools by volume on the network\n  \
-        2. Extracts unique tokens from those pools\n  \
-        3. Fetches full detail for each token (price, volume, liquidity, buys/sells)\n  \
-        4. Ranks by 24h volume")]
+    /// Get top tokens on a network ranked by volume, price, liquidity, or activity
+    #[command(name = "top-tokens", after_help = "EXAMPLES:\n  dexpaprika-cli top-tokens ethereum\n  dexpaprika-cli top-tokens solana --limit 20\n  dexpaprika-cli top-tokens ethereum --order-by price_change --sort asc")]
     TopTokens {
         /// Network ID (e.g., ethereum, solana, bsc)
         network: String,
-        /// Number of tokens to display
+        /// Maximum number of results (max 100)
         #[arg(long, default_value = "20")]
         limit: usize,
-        /// Number of pools to scan for token discovery (more = wider coverage)
-        #[arg(long, default_value = "100")]
-        pools: usize,
+        /// Page number (1-indexed)
+        #[arg(long, default_value = "1")]
+        page: usize,
+        /// Order by field (volume_24h, price_usd, liquidity_usd, txns, price_change)
+        #[arg(long, default_value = "volume_24h")]
+        order_by: String,
+        /// Sort direction (asc, desc)
+        #[arg(long, default_value = "desc")]
+        sort: String,
     },
 
     /// Get batch prices for multiple tokens
@@ -372,8 +373,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
         Commands::FilterTokens { network, limit, page, sort_by, sort_dir, volume_24h_min, volume_24h_max, liquidity_usd_min, fdv_min, fdv_max, txns_24h_min, created_after, created_before } => {
             commands::tokens::execute_filter_tokens(&client, &network, limit, page, &sort_by, &sort_dir, volume_24h_min, volume_24h_max, liquidity_usd_min, fdv_min, fdv_max, txns_24h_min, created_after, created_before, output, raw).await
         }
-        Commands::TopTokens { network, limit, pools } => {
-            commands::tokens::execute_top_tokens(&client, &network, limit, pools, output, raw).await
+        Commands::TopTokens { network, limit, page, order_by, sort } => {
+            commands::tokens::execute_top_tokens(&client, &network, limit, page, &order_by, &sort, output, raw).await
         }
         Commands::Prices { network, tokens } => {
             commands::tokens::execute_prices(&client, &network, &tokens, output, raw).await
