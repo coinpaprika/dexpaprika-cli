@@ -125,6 +125,7 @@ pub struct PoolOhlcv {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PoolFilterResponse {
     pub results: Vec<PoolFilterItem>,
+    pub page_info: Option<crate::commands::tokens::PageInfo>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -133,6 +134,7 @@ pub struct PoolFilterItem {
     pub chain: Option<String>,
     pub dex_id: Option<String>,
     pub volume_usd_24h: Option<f64>,
+    pub volume_usd_7d: Option<f64>,
     pub liquidity_usd: Option<f64>,
     pub txns_24h: Option<i64>,
     pub created_at: Option<String>,
@@ -143,6 +145,10 @@ pub async fn execute_pool_filter(
     network: &str,
     volume_24h_min: Option<f64>,
     volume_24h_max: Option<f64>,
+    volume_7d_min: Option<f64>,
+    volume_7d_max: Option<f64>,
+    liquidity_usd_min: Option<f64>,
+    liquidity_usd_max: Option<f64>,
     txns_24h_min: Option<u64>,
     created_after: Option<u64>,
     created_before: Option<u64>,
@@ -161,32 +167,32 @@ pub async fn execute_pool_filter(
         ("sort_by", sort_by.to_string()),
         ("sort_dir", sort_dir.to_string()),
     ];
-    if let Some(v) = volume_24h_min {
-        params.push(("volume_24h_min", v.to_string()));
-    }
-    if let Some(v) = volume_24h_max {
-        params.push(("volume_24h_max", v.to_string()));
-    }
-    if let Some(v) = txns_24h_min {
-        params.push(("txns_24h_min", v.to_string()));
-    }
-    if let Some(v) = created_after {
-        params.push(("created_after", v.to_string()));
-    }
-    if let Some(v) = created_before {
-        params.push(("created_before", v.to_string()));
-    }
+    if let Some(v) = volume_24h_min { params.push(("volume_24h_min", v.to_string())); }
+    if let Some(v) = volume_24h_max { params.push(("volume_24h_max", v.to_string())); }
+    if let Some(v) = volume_7d_min { params.push(("volume_7d_min", v.to_string())); }
+    if let Some(v) = volume_7d_max { params.push(("volume_7d_max", v.to_string())); }
+    if let Some(v) = liquidity_usd_min { params.push(("liquidity_usd_min", v.to_string())); }
+    if let Some(v) = liquidity_usd_max { params.push(("liquidity_usd_max", v.to_string())); }
+    if let Some(v) = txns_24h_min { params.push(("txns_24h_min", v.to_string())); }
+    if let Some(v) = created_after { params.push(("created_after", v.to_string())); }
+    if let Some(v) = created_before { params.push(("created_before", v.to_string())); }
 
     let param_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
     let resp: PoolFilterResponse = client.dexpaprika_get(
         &format!("/networks/{network}/pools/filter"),
         &param_refs,
     ).await?;
-    let results = resp.results;
+
     match output {
-        OutputFormat::Table => crate::output::pools::print_pool_filter_table(&results),
+        OutputFormat::Table => {
+            crate::output::pools::print_pool_filter_table(&resp.results);
+            if let Some(pi) = &resp.page_info {
+                println!("  Page {}/{} ({} pools total)",
+                    pi.page.unwrap_or(0), pi.total_pages.unwrap_or(0), pi.total_items.unwrap_or(0));
+            }
+        }
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&results, crate::output::ResponseMeta::dexpaprika(&format!("/network/{network}/pools/filter")), raw)?;
+            crate::output::print_json_wrapped(&resp, crate::output::ResponseMeta::dexpaprika(&format!("/networks/{network}/pools/filter")), raw)?;
         }
     }
     Ok(())

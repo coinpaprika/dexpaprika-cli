@@ -75,8 +75,8 @@ enum Commands {
         sort: String,
     },
 
-    /// Filter pools by volume, transactions, and creation date
-    #[command(name = "pool-filter", after_help = "EXAMPLES:\n  dexpaprika-cli pool-filter ethereum --volume-24h-min 100000\n  dexpaprika-cli pool-filter solana --txns-24h-min 500 --sort-by volume_24h")]
+    /// Filter pools by volume, liquidity, transactions, and creation date
+    #[command(name = "pool-filter", after_help = "EXAMPLES:\n  dexpaprika-cli pool-filter ethereum --volume-24h-min 100000\n  dexpaprika-cli pool-filter solana --liquidity-usd-min 50000 --sort-by liquidity")]
     PoolFilter {
         /// Network ID (e.g., ethereum, solana)
         network: String,
@@ -86,6 +86,18 @@ enum Commands {
         /// Maximum 24h volume in USD
         #[arg(long)]
         volume_24h_max: Option<f64>,
+        /// Minimum 7d volume in USD
+        #[arg(long)]
+        volume_7d_min: Option<f64>,
+        /// Maximum 7d volume in USD
+        #[arg(long)]
+        volume_7d_max: Option<f64>,
+        /// Minimum pool liquidity in USD
+        #[arg(long)]
+        liquidity_usd_min: Option<f64>,
+        /// Maximum pool liquidity in USD
+        #[arg(long)]
+        liquidity_usd_max: Option<f64>,
         /// Minimum transactions in 24h
         #[arg(long)]
         txns_24h_min: Option<u64>,
@@ -95,7 +107,7 @@ enum Commands {
         /// Only pools created before this UNIX timestamp
         #[arg(long)]
         created_before: Option<u64>,
-        /// Sort by field: volume_24h, txns_24h, created_at
+        /// Sort by field: volume_24h, volume_7d, volume_30d, liquidity, txns_24h, created_at
         #[arg(long, default_value = "volume_24h")]
         sort_by: String,
         /// Sort direction: asc or desc
@@ -349,8 +361,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
         Commands::Pools { network, limit, page, order_by, sort } => {
             commands::pools::execute_pools(&client, &network, limit, page, &order_by, &sort, output, raw).await
         }
-        Commands::PoolFilter { network, volume_24h_min, volume_24h_max, txns_24h_min, created_after, created_before, sort_by, sort_dir, limit, page } => {
-            commands::pools::execute_pool_filter(&client, &network, volume_24h_min, volume_24h_max, txns_24h_min, created_after, created_before, &sort_by, &sort_dir, limit, page, output, raw).await
+        Commands::PoolFilter { network, volume_24h_min, volume_24h_max, volume_7d_min, volume_7d_max, liquidity_usd_min, liquidity_usd_max, txns_24h_min, created_after, created_before, sort_by, sort_dir, limit, page } => {
+            commands::pools::execute_pool_filter(&client, &network, volume_24h_min, volume_24h_max, volume_7d_min, volume_7d_max, liquidity_usd_min, liquidity_usd_max, txns_24h_min, created_after, created_before, &sort_by, &sort_dir, limit, page, output, raw).await
         }
         Commands::Pool { network, pool_address, inversed } => {
             commands::pools::execute_pool_detail(&client, &network, &pool_address, inversed, output, raw).await
