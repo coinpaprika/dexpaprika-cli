@@ -23,6 +23,16 @@ pub fn print_token_detail(token: &TokenDetail) {
             detail_field!(rows, "Website", website.clone());
         }
     }
+    if let Some(telegram) = &token.telegram {
+        if !telegram.is_empty() {
+            detail_field!(rows, "Telegram", telegram.clone());
+        }
+    }
+    if let Some(twitter) = &token.twitter {
+        if !twitter.is_empty() {
+            detail_field!(rows, "Twitter", twitter.clone());
+        }
+    }
 
     if let Some(summary) = &token.summary {
         detail_field!(rows, "Price (USD)", summary.price_usd.map(format_price).unwrap_or_else(|| "—".into()));

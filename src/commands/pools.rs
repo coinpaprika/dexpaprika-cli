@@ -282,13 +282,23 @@ pub async fn execute_transactions(
     pool_address: &str,
     limit: usize,
     cursor: Option<&str>,
+    from: Option<i64>,
+    to: Option<i64>,
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
     let limit_str = limit.to_string();
+    let from_str = from.map(|f| f.to_string());
+    let to_str = to.map(|t| t.to_string());
     let mut params: Vec<(&str, &str)> = vec![("limit", &limit_str)];
     if let Some(c) = cursor {
         params.push(("cursor", c));
+    }
+    if let Some(ref f) = from_str {
+        params.push(("from", f));
+    }
+    if let Some(ref t) = to_str {
+        params.push(("to", t));
     }
     let resp: TransactionsResponse = client.dexpaprika_get(
         &format!("/networks/{network}/pools/{pool_address}/transactions"),

@@ -155,7 +155,7 @@ enum Commands {
     },
 
     /// Get recent transactions for a pool
-    #[command(after_help = "EXAMPLES:\n  dexpaprika-cli transactions ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --limit 20")]
+    #[command(after_help = "EXAMPLES:\n  dexpaprika-cli transactions ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --limit 20\n  dexpaprika-cli transactions ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --from 1712700000 --to 1712800000")]
     Transactions {
         /// Network ID
         network: String,
@@ -167,6 +167,12 @@ enum Commands {
         /// Cursor for pagination
         #[arg(long)]
         cursor: Option<String>,
+        /// Filter transactions starting from this UNIX timestamp (inclusive, max 7 days)
+        #[arg(long)]
+        from: Option<i64>,
+        /// Filter transactions up to this UNIX timestamp (exclusive)
+        #[arg(long)]
+        to: Option<i64>,
     },
 
     /// Get OHLCV data for a pool
@@ -370,8 +376,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
         Commands::DexPools { network, dex, limit, page, order_by, sort } => {
             commands::pools::execute_dex_pools(&client, &network, &dex, limit, page, &order_by, &sort, output, raw).await
         }
-        Commands::Transactions { network, pool_address, limit, cursor } => {
-            commands::pools::execute_transactions(&client, &network, &pool_address, limit, cursor.as_deref(), output, raw).await
+        Commands::Transactions { network, pool_address, limit, cursor, from, to } => {
+            commands::pools::execute_transactions(&client, &network, &pool_address, limit, cursor.as_deref(), from, to, output, raw).await
         }
         Commands::PoolOhlcv { network, pool_address, start, end, interval, limit, inversed } => {
             commands::pools::execute_ohlcv(&client, &network, &pool_address, &start, end.as_deref(), &interval, limit, inversed, output, raw).await
