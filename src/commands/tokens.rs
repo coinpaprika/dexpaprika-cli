@@ -14,6 +14,8 @@ pub struct TokenDetail {
     pub total_supply: Option<f64>,
     pub description: Option<String>,
     pub website: Option<String>,
+    pub telegram: Option<String>,
+    pub twitter: Option<String>,
     pub has_image: Option<bool>,
     pub added_at: Option<String>,
     pub price_stats: Option<TokenPriceStats>,
