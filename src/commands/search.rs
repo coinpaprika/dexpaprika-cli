@@ -55,15 +55,23 @@ pub struct DexSearchDex {
     pub chain: Option<String>,
 }
 
-pub async fn execute(client: &ApiClient, query: &str, output: OutputFormat, raw: bool) -> Result<()> {
-    let result: DexSearchResult = client.dexpaprika_get(
-        "/search",
-        &[("query", query)],
-    ).await?;
+pub async fn execute(
+    client: &ApiClient,
+    query: &str,
+    output: OutputFormat,
+    raw: bool,
+) -> Result<()> {
+    let result: DexSearchResult = client
+        .dexpaprika_get("/search", &[("query", query)])
+        .await?;
     match output {
         OutputFormat::Table => crate::output::search::print_dex_search(&result),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&result, crate::output::ResponseMeta::dexpaprika("/search"), raw)?;
+            crate::output::print_json_wrapped(
+                &result,
+                crate::output::ResponseMeta::dexpaprika("/search"),
+                raw,
+            )?;
         }
     }
     Ok(())

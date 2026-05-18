@@ -167,32 +167,59 @@ pub async fn execute_pool_filter(
         ("sort_by", sort_by.to_string()),
         ("sort_dir", sort_dir.to_string()),
     ];
-    if let Some(v) = volume_24h_min { params.push(("volume_24h_min", v.to_string())); }
-    if let Some(v) = volume_24h_max { params.push(("volume_24h_max", v.to_string())); }
-    if let Some(v) = volume_7d_min { params.push(("volume_7d_min", v.to_string())); }
-    if let Some(v) = volume_7d_max { params.push(("volume_7d_max", v.to_string())); }
-    if let Some(v) = liquidity_usd_min { params.push(("liquidity_usd_min", v.to_string())); }
-    if let Some(v) = liquidity_usd_max { params.push(("liquidity_usd_max", v.to_string())); }
-    if let Some(v) = txns_24h_min { params.push(("txns_24h_min", v.to_string())); }
-    if let Some(v) = created_after { params.push(("created_after", v.to_string())); }
-    if let Some(v) = created_before { params.push(("created_before", v.to_string())); }
+    if let Some(v) = volume_24h_min {
+        params.push(("volume_24h_min", v.to_string()));
+    }
+    if let Some(v) = volume_24h_max {
+        params.push(("volume_24h_max", v.to_string()));
+    }
+    if let Some(v) = volume_7d_min {
+        params.push(("volume_7d_min", v.to_string()));
+    }
+    if let Some(v) = volume_7d_max {
+        params.push(("volume_7d_max", v.to_string()));
+    }
+    if let Some(v) = liquidity_usd_min {
+        params.push(("liquidity_usd_min", v.to_string()));
+    }
+    if let Some(v) = liquidity_usd_max {
+        params.push(("liquidity_usd_max", v.to_string()));
+    }
+    if let Some(v) = txns_24h_min {
+        params.push(("txns_24h_min", v.to_string()));
+    }
+    if let Some(v) = created_after {
+        params.push(("created_after", v.to_string()));
+    }
+    if let Some(v) = created_before {
+        params.push(("created_before", v.to_string()));
+    }
 
     let param_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
-    let resp: PoolFilterResponse = client.dexpaprika_get(
-        &format!("/networks/{network}/pools/filter"),
-        &param_refs,
-    ).await?;
+    let resp: PoolFilterResponse = client
+        .dexpaprika_get(&format!("/networks/{network}/pools/filter"), &param_refs)
+        .await?;
 
     match output {
         OutputFormat::Table => {
             crate::output::pools::print_pool_filter_table(&resp.results);
             if let Some(pi) = &resp.page_info {
-                println!("  Page {}/{} ({} pools total)",
-                    pi.page.unwrap_or(0), pi.total_pages.unwrap_or(0), pi.total_items.unwrap_or(0));
+                println!(
+                    "  Page {}/{} ({} pools total)",
+                    pi.page.unwrap_or(0),
+                    pi.total_pages.unwrap_or(0),
+                    pi.total_items.unwrap_or(0)
+                );
             }
         }
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&resp, crate::output::ResponseMeta::dexpaprika(&format!("/networks/{network}/pools/filter")), raw)?;
+            crate::output::print_json_wrapped(
+                &resp,
+                crate::output::ResponseMeta::dexpaprika(&format!(
+                    "/networks/{network}/pools/filter"
+                )),
+                raw,
+            )?;
         }
     }
     Ok(())
@@ -210,15 +237,26 @@ pub async fn execute_pools(
 ) -> Result<()> {
     let limit_str = limit.to_string();
     let page_str = page.to_string();
-    let resp: PoolsResponse = client.dexpaprika_get(
-        &format!("/networks/{network}/pools"),
-        &[("limit", &limit_str), ("page", &page_str), ("order_by", order_by), ("sort", sort)],
-    ).await?;
+    let resp: PoolsResponse = client
+        .dexpaprika_get(
+            &format!("/networks/{network}/pools"),
+            &[
+                ("limit", &limit_str),
+                ("page", &page_str),
+                ("order_by", order_by),
+                ("sort", sort),
+            ],
+        )
+        .await?;
     let pools = resp.pools;
     match output {
         OutputFormat::Table => crate::output::pools::print_pools_table(&pools),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&pools, crate::output::ResponseMeta::dexpaprika(&format!("/network/{network}/pools")), raw)?;
+            crate::output::print_json_wrapped(
+                &pools,
+                crate::output::ResponseMeta::dexpaprika(&format!("/network/{network}/pools")),
+                raw,
+            )?;
         }
     }
     Ok(())
@@ -236,14 +274,20 @@ pub async fn execute_pool_detail(
     if inversed {
         params.push(("inversed", "true"));
     }
-    let pool: PoolDetail = client.dexpaprika_get(
-        &format!("/networks/{network}/pools/{pool_address}"),
-        &params,
-    ).await?;
+    let pool: PoolDetail = client
+        .dexpaprika_get(
+            &format!("/networks/{network}/pools/{pool_address}"),
+            &params,
+        )
+        .await?;
     match output {
         OutputFormat::Table => crate::output::pools::print_pool_detail(&pool),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&pool, crate::output::ResponseMeta::dexpaprika(&format!("/pool/{network}/{pool_address}")), raw)?;
+            crate::output::print_json_wrapped(
+                &pool,
+                crate::output::ResponseMeta::dexpaprika(&format!("/pool/{network}/{pool_address}")),
+                raw,
+            )?;
         }
     }
     Ok(())
@@ -262,15 +306,26 @@ pub async fn execute_dex_pools(
 ) -> Result<()> {
     let limit_str = limit.to_string();
     let page_str = page.to_string();
-    let resp: PoolsResponse = client.dexpaprika_get(
-        &format!("/networks/{network}/dexes/{dex}/pools"),
-        &[("limit", &limit_str), ("page", &page_str), ("order_by", order_by), ("sort", sort)],
-    ).await?;
+    let resp: PoolsResponse = client
+        .dexpaprika_get(
+            &format!("/networks/{network}/dexes/{dex}/pools"),
+            &[
+                ("limit", &limit_str),
+                ("page", &page_str),
+                ("order_by", order_by),
+                ("sort", sort),
+            ],
+        )
+        .await?;
     let pools = resp.pools;
     match output {
         OutputFormat::Table => crate::output::pools::print_pools_table(&pools),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&pools, crate::output::ResponseMeta::dexpaprika(&format!("/dex/{network}/{dex}/pools")), raw)?;
+            crate::output::print_json_wrapped(
+                &pools,
+                crate::output::ResponseMeta::dexpaprika(&format!("/dex/{network}/{dex}/pools")),
+                raw,
+            )?;
         }
     }
     Ok(())
@@ -300,15 +355,23 @@ pub async fn execute_transactions(
     if let Some(ref t) = to_str {
         params.push(("to", t));
     }
-    let resp: TransactionsResponse = client.dexpaprika_get(
-        &format!("/networks/{network}/pools/{pool_address}/transactions"),
-        &params,
-    ).await?;
+    let resp: TransactionsResponse = client
+        .dexpaprika_get(
+            &format!("/networks/{network}/pools/{pool_address}/transactions"),
+            &params,
+        )
+        .await?;
     let txs = resp.transactions;
     match output {
         OutputFormat::Table => crate::output::pools::print_transactions_table(&txs),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&txs, crate::output::ResponseMeta::dexpaprika(&format!("/pool/{network}/{pool_address}/transactions")), raw)?;
+            crate::output::print_json_wrapped(
+                &txs,
+                crate::output::ResponseMeta::dexpaprika(&format!(
+                    "/pool/{network}/{pool_address}/transactions"
+                )),
+                raw,
+            )?;
         }
     }
     Ok(())
@@ -328,10 +391,13 @@ pub async fn execute_ohlcv(
 ) -> Result<()> {
     // Validate start date format
     let is_unix = start.chars().all(|c| c.is_ascii_digit());
-    let is_date = start.len() == 10 && start.chars().nth(4) == Some('-') && start.chars().nth(7) == Some('-');
+    let is_date =
+        start.len() == 10 && start.chars().nth(4) == Some('-') && start.chars().nth(7) == Some('-');
     let is_rfc3339 = start.contains('T');
     if !is_unix && !is_date && !is_rfc3339 {
-        anyhow::bail!("Invalid --start format: \"{start}\". Use yyyy-mm-dd, unix timestamp, or RFC3339.");
+        anyhow::bail!(
+            "Invalid --start format: \"{start}\". Use yyyy-mm-dd, unix timestamp, or RFC3339."
+        );
     }
 
     let limit_str = limit.to_string();
@@ -347,14 +413,22 @@ pub async fn execute_ohlcv(
         params.push(("inversed", "true"));
     }
 
-    let data: Vec<PoolOhlcv> = client.dexpaprika_get(
-        &format!("/networks/{network}/pools/{pool_address}/ohlcv"),
-        &params,
-    ).await?;
+    let data: Vec<PoolOhlcv> = client
+        .dexpaprika_get(
+            &format!("/networks/{network}/pools/{pool_address}/ohlcv"),
+            &params,
+        )
+        .await?;
     match output {
         OutputFormat::Table => crate::output::pools::print_pool_ohlcv_table(&data),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&data, crate::output::ResponseMeta::dexpaprika(&format!("/pool/{network}/{pool_address}/ohlcv")), raw)?;
+            crate::output::print_json_wrapped(
+                &data,
+                crate::output::ResponseMeta::dexpaprika(&format!(
+                    "/pool/{network}/{pool_address}/ohlcv"
+                )),
+                raw,
+            )?;
         }
     }
     Ok(())

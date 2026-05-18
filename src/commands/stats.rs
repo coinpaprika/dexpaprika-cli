@@ -17,7 +17,11 @@ pub async fn execute(client: &ApiClient, output: OutputFormat, raw: bool) -> Res
     match output {
         OutputFormat::Table => crate::output::stats::print_stats(&stats),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&stats, crate::output::ResponseMeta::dexpaprika(""), raw)?;
+            crate::output::print_json_wrapped(
+                &stats,
+                crate::output::ResponseMeta::dexpaprika(""),
+                raw,
+            )?;
         }
     }
     Ok(())

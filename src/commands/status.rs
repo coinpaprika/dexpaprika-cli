@@ -23,7 +23,11 @@ pub async fn execute_status(client: &ApiClient, output: OutputFormat, raw: bool)
 
     let result = StatusResult {
         dexpaprika: ApiStatus {
-            status: if dp_result.is_ok() { "OK".into() } else { "ERROR".into() },
+            status: if dp_result.is_ok() {
+                "OK".into()
+            } else {
+                "ERROR".into()
+            },
             response_time_ms: dp_time,
         },
     };
@@ -31,7 +35,11 @@ pub async fn execute_status(client: &ApiClient, output: OutputFormat, raw: bool)
     match output {
         OutputFormat::Table => crate::output::status::print_status(&result),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&result, crate::output::ResponseMeta::dexpaprika("/status"), raw)?;
+            crate::output::print_json_wrapped(
+                &result,
+                crate::output::ResponseMeta::dexpaprika("/status"),
+                raw,
+            )?;
         }
     }
     Ok(())
