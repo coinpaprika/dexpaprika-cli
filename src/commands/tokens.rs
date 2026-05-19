@@ -197,56 +197,92 @@ pub async fn execute_top_tokens(
 ) -> Result<()> {
     let limit_str = limit.to_string();
     let page_str = page.to_string();
-    let resp: TopTokensResponse = client.dexpaprika_get(
-        &format!("/networks/{network}/tokens/top"),
-        &[("limit", &limit_str), ("page", &page_str), ("order_by", order_by), ("sort", sort)],
-    ).await?;
+    let resp: TopTokensResponse = client
+        .dexpaprika_get(
+            &format!("/networks/{network}/tokens/top"),
+            &[
+                ("limit", &limit_str),
+                ("page", &page_str),
+                ("order_by", order_by),
+                ("sort", sort),
+            ],
+        )
+        .await?;
 
-    let entries: Vec<TopTokenEntry> = resp.tokens.iter().map(|t| {
-        let (vol, change, buys, sells, txns) = match &t.h24 {
-            Some(h) => (h.volume_usd, h.last_price_usd_change, h.buys, h.sells, h.txns),
-            None => (None, None, None, None, None),
-        };
-        TopTokenEntry {
-            address: t.address.clone().unwrap_or_default(),
-            name: t.name.clone().unwrap_or_default(),
-            symbol: t.symbol.clone().unwrap_or_default(),
-            price_usd: t.price_usd,
-            volume_usd_24h: vol,
-            change_24h: change,
-            liquidity_usd: t.liquidity_usd,
-            buys_24h: buys,
-            sells_24h: sells,
-            txns_24h: txns,
-            fdv: t.fdv,
-            pools: t.pools,
-        }
-    }).collect();
+    let entries: Vec<TopTokenEntry> = resp
+        .tokens
+        .iter()
+        .map(|t| {
+            let (vol, change, buys, sells, txns) = match &t.h24 {
+                Some(h) => (
+                    h.volume_usd,
+                    h.last_price_usd_change,
+                    h.buys,
+                    h.sells,
+                    h.txns,
+                ),
+                None => (None, None, None, None, None),
+            };
+            TopTokenEntry {
+                address: t.address.clone().unwrap_or_default(),
+                name: t.name.clone().unwrap_or_default(),
+                symbol: t.symbol.clone().unwrap_or_default(),
+                price_usd: t.price_usd,
+                volume_usd_24h: vol,
+                change_24h: change,
+                liquidity_usd: t.liquidity_usd,
+                buys_24h: buys,
+                sells_24h: sells,
+                txns_24h: txns,
+                fdv: t.fdv,
+                pools: t.pools,
+            }
+        })
+        .collect();
 
     match output {
         OutputFormat::Table => {
             crate::output::tokens::print_top_tokens_table(&entries);
             if let Some(pi) = &resp.page_info {
-                println!("  Page {}/{} ({} tokens total)",
-                    pi.page.unwrap_or(0), pi.total_pages.unwrap_or(0), pi.total_items.unwrap_or(0));
+                println!(
+                    "  Page {}/{} ({} tokens total)",
+                    pi.page.unwrap_or(0),
+                    pi.total_pages.unwrap_or(0),
+                    pi.total_items.unwrap_or(0)
+                );
             }
         }
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&resp, crate::output::ResponseMeta::dexpaprika(&format!("/networks/{network}/tokens/top")), raw)?;
+            crate::output::print_json_wrapped(
+                &resp,
+                crate::output::ResponseMeta::dexpaprika(&format!("/networks/{network}/tokens/top")),
+                raw,
+            )?;
         }
     }
     Ok(())
 }
 
-pub async fn execute_token(client: &ApiClient, network: &str, token_address: &str, output: OutputFormat, raw: bool) -> Result<()> {
-    let token: TokenDetail = client.dexpaprika_get(
-        &format!("/networks/{network}/tokens/{token_address}"),
-        &[],
-    ).await?;
+pub async fn execute_token(
+    client: &ApiClient,
+    network: &str,
+    token_address: &str,
+    output: OutputFormat,
+    raw: bool,
+) -> Result<()> {
+    let token: TokenDetail = client
+        .dexpaprika_get(&format!("/networks/{network}/tokens/{token_address}"), &[])
+        .await?;
     match output {
         OutputFormat::Table => crate::output::tokens::print_token_detail(&token),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&token, crate::output::ResponseMeta::dexpaprika(&format!("/token/{network}/{token_address}")), raw)?;
+            crate::output::print_json_wrapped(
+                &token,
+                crate::output::ResponseMeta::dexpaprika(&format!(
+                    "/token/{network}/{token_address}"
+                )),
+                raw,
+            )?;
         }
     }
     Ok(())
@@ -265,34 +301,61 @@ pub async fn execute_token_pools(
 ) -> Result<()> {
     let limit_str = limit.to_string();
     let page_str = page.to_string();
-    let resp: TokenPoolsResponse = client.dexpaprika_get(
-        &format!("/networks/{network}/tokens/{token_address}/pools"),
-        &[("limit", &limit_str), ("page", &page_str), ("order_by", order_by), ("sort", sort)],
-    ).await?;
+    let resp: TokenPoolsResponse = client
+        .dexpaprika_get(
+            &format!("/networks/{network}/tokens/{token_address}/pools"),
+            &[
+                ("limit", &limit_str),
+                ("page", &page_str),
+                ("order_by", order_by),
+                ("sort", sort),
+            ],
+        )
+        .await?;
     let pools = resp.pools;
     match output {
         OutputFormat::Table => crate::output::tokens::print_token_pools_table(&pools),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&pools, crate::output::ResponseMeta::dexpaprika(&format!("/token/{network}/{token_address}/pools")), raw)?;
+            crate::output::print_json_wrapped(
+                &pools,
+                crate::output::ResponseMeta::dexpaprika(&format!(
+                    "/token/{network}/{token_address}/pools"
+                )),
+                raw,
+            )?;
         }
     }
     Ok(())
 }
 
-pub async fn execute_prices(client: &ApiClient, network: &str, tokens: &str, output: OutputFormat, raw: bool) -> Result<()> {
-    let prices: Vec<TokenPrice> = client.dexpaprika_get(
-        &format!("/networks/{network}/multi/prices"),
-        &[("tokens", tokens)],
-    ).await?;
+pub async fn execute_prices(
+    client: &ApiClient,
+    network: &str,
+    tokens: &str,
+    output: OutputFormat,
+    raw: bool,
+) -> Result<()> {
+    let prices: Vec<TokenPrice> = client
+        .dexpaprika_get(
+            &format!("/networks/{network}/multi/prices"),
+            &[("tokens", tokens)],
+        )
+        .await?;
 
     if prices.is_empty() {
-        anyhow::bail!("No price data found. Check that the token addresses are valid on {network}.");
+        anyhow::bail!(
+            "No price data found. Check that the token addresses are valid on {network}."
+        );
     }
 
     match output {
         OutputFormat::Table => crate::output::tokens::print_prices_table(&prices),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&prices, crate::output::ResponseMeta::dexpaprika(&format!("/network/{network}/prices")), raw)?;
+            crate::output::print_json_wrapped(
+                &prices,
+                crate::output::ResponseMeta::dexpaprika(&format!("/network/{network}/prices")),
+                raw,
+            )?;
         }
     }
     Ok(())
@@ -325,32 +388,57 @@ pub async fn execute_filter_tokens(
         ("sort_by", sort_by.to_string()),
         ("sort_dir", sort_dir.to_string()),
     ];
-    if let Some(v) = volume_24h_min { params.push(("volume_24h_min", v.to_string())); }
-    if let Some(v) = volume_24h_max { params.push(("volume_24h_max", v.to_string())); }
-    if let Some(v) = liquidity_usd_min { params.push(("liquidity_usd_min", v.to_string())); }
-    if let Some(v) = fdv_min { params.push(("fdv_min", v.to_string())); }
-    if let Some(v) = fdv_max { params.push(("fdv_max", v.to_string())); }
-    if let Some(v) = txns_24h_min { params.push(("txns_24h_min", v.to_string())); }
-    if let Some(v) = created_after { params.push(("created_after", v.to_string())); }
-    if let Some(v) = created_before { params.push(("created_before", v.to_string())); }
+    if let Some(v) = volume_24h_min {
+        params.push(("volume_24h_min", v.to_string()));
+    }
+    if let Some(v) = volume_24h_max {
+        params.push(("volume_24h_max", v.to_string()));
+    }
+    if let Some(v) = liquidity_usd_min {
+        params.push(("liquidity_usd_min", v.to_string()));
+    }
+    if let Some(v) = fdv_min {
+        params.push(("fdv_min", v.to_string()));
+    }
+    if let Some(v) = fdv_max {
+        params.push(("fdv_max", v.to_string()));
+    }
+    if let Some(v) = txns_24h_min {
+        params.push(("txns_24h_min", v.to_string()));
+    }
+    if let Some(v) = created_after {
+        params.push(("created_after", v.to_string()));
+    }
+    if let Some(v) = created_before {
+        params.push(("created_before", v.to_string()));
+    }
 
     let param_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
 
-    let resp: TokenFilterResponse = client.dexpaprika_get(
-        &format!("/networks/{network}/tokens/filter"),
-        &param_refs,
-    ).await?;
+    let resp: TokenFilterResponse = client
+        .dexpaprika_get(&format!("/networks/{network}/tokens/filter"), &param_refs)
+        .await?;
 
     match output {
         OutputFormat::Table => {
             crate::output::tokens::print_token_filter_table(&resp.results);
             if let Some(pi) = &resp.page_info {
-                println!("  Page {}/{} ({} tokens total)",
-                    pi.page.unwrap_or(0), pi.total_pages.unwrap_or(0), pi.total_items.unwrap_or(0));
+                println!(
+                    "  Page {}/{} ({} tokens total)",
+                    pi.page.unwrap_or(0),
+                    pi.total_pages.unwrap_or(0),
+                    pi.total_items.unwrap_or(0)
+                );
             }
         }
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&resp, crate::output::ResponseMeta::dexpaprika(&format!("/networks/{network}/tokens/filter")), raw)?;
+            crate::output::print_json_wrapped(
+                &resp,
+                crate::output::ResponseMeta::dexpaprika(&format!(
+                    "/networks/{network}/tokens/filter"
+                )),
+                raw,
+            )?;
         }
     }
     Ok(())

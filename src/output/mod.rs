@@ -116,9 +116,7 @@ pub fn print_detail_table(rows: Vec<[String; 2]>) {
 }
 
 pub fn print_dexpaprika_footer() {
-    println!(
-        "\n Data: DexPaprika (dexpaprika.com) \u{00b7} Free API: api.dexpaprika.com"
-    );
+    println!("\n Data: DexPaprika (dexpaprika.com) \u{00b7} Free API: api.dexpaprika.com");
 }
 
 macro_rules! detail_field {
@@ -129,13 +127,14 @@ macro_rules! detail_field {
 
 pub(crate) use detail_field;
 
-pub mod stats;
 pub mod networks;
 pub mod pools;
-pub mod tokens;
 pub mod search;
-pub mod stream;
+pub mod stats;
 pub mod status;
+pub mod stream;
+pub mod stream_reserves;
+pub mod tokens;
 
 #[cfg(test)]
 mod tests {

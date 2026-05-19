@@ -1,127 +1,260 @@
-# DexPaprika Streaming — Real-Time Token Prices
+# DexPaprika Streaming Skill (CLI)
 
-Stream live crypto prices via SSE. ~1 second updates, 1–2,000 tokens per connection. No API key, no rate limits.
+Two SSE feeds, one transport. No API key, no auth.
+
+- `dexpaprika-cli stream …` for live token prices (`/sse/prices`).
+- `dexpaprika-cli stream-reserves …` for block-level pool reserves (`/sse/reserves`).
+
+**Limits:** 25 subscriptions per POST connection. 10 concurrent SSE streams per IP. A `ping` event lands every 15s.
 
 ---
 
 ## Option A: CLI (Recommended)
 
-Install (if you haven't already):
+Install:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/coinpaprika/dexpaprika-cli/main/install.sh | sh
 ```
 
-Then stream:
-
-### Single token
+### Stream prices
 
 ```bash
+# Single token
 dexpaprika-cli stream ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2
-```
 
-### Multiple tokens
+# Multiple tokens via watchlist file (JSON array, up to 25 entries)
+dexpaprika-cli stream --tokens watchlist.json
 
-```bash
-dexpaprika-cli stream ethereum --tokens 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2,0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48
-```
-
-### Limit events
-
-```bash
+# Cap event count for smoke-tests
 dexpaprika-cli stream ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --limit 10
+
+# JSON output for piping
+dexpaprika-cli -o json stream ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --limit 5
+```
+
+Watchlist file format:
+
+```json
+[
+  {"chain": "ethereum", "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"},
+  {"chain": "solana",   "address": "So11111111111111111111111111111111111111112"}
+]
+```
+
+### Stream reserves
+
+```bash
+# Single pool: fires on every reserve change in that pool
+dexpaprika-cli stream-reserves ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --method pool_reserves
+
+# Single token: fires for every pool containing that token (high volume on USDC etc.)
+dexpaprika-cli stream-reserves ethereum 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 --method token_reserves --limit 10
+
+# Multi-target via subscriptions file (up to 25 entries, can mix methods)
+dexpaprika-cli stream-reserves --subscriptions reserves.json
+```
+
+Subscriptions file format:
+
+```json
+[
+  {"chain": "ethereum", "address": "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640", "method": "pool_reserves"},
+  {"chain": "ethereum", "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", "method": "token_reserves"}
+]
 ```
 
 ---
 
 ## Option B: Direct SSE API
 
-Can't install binaries? Connect to the SSE endpoint directly.
+Can't install binaries? Connect to the SSE endpoints directly.
 
 **Base URL:** `https://streaming.dexpaprika.com`
 
-### Single token (GET)
+### Stream prices, single token (GET)
 
-`GET /stream?method=t_p&chain={network}&address={token_address}`
-
-```python
-import requests, json
-
-r = requests.get("https://streaming.dexpaprika.com/stream",
-    params={"method": "t_p", "chain": "ethereum", "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"},
-    stream=True)
-
-for line in r.iter_lines():
-    if line and line.startswith(b'data:'):
-        data = json.loads(line[5:])
-        print(f"{data['c']} {data['a']}: ${data['p']}")
+```
+GET /sse/prices?method=token_price&chain={network}&address={token_address}
 ```
 
-### Multiple tokens (POST)
+```python
+import json, requests
 
-`POST /stream` with `Accept: text/event-stream` and `Content-Type: application/json`.
+url = "https://streaming.dexpaprika.com/sse/prices"
+params = {"method": "token_price", "chain": "ethereum",
+          "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"}
 
-Body: array of `{"chain", "address", "method": "t_p"}` objects (max 2,000).
+with requests.get(url, params=params, stream=True) as r:
+    r.raise_for_status()
+    msg_lines = []
+    for line in r.iter_lines(decode_unicode=True):
+        if line:
+            msg_lines.append(line); continue
+        # Blank line: dispatch the buffered message.
+        event_type, data_str = "message", None
+        for ml in msg_lines:
+            if ml.startswith("event:"):
+                event_type = ml.split(":", 1)[1].strip()
+            elif ml.startswith("data:"):
+                data_str = ml[5:].lstrip()
+        msg_lines = []
+        if event_type == "token_price" and data_str:
+            d = json.loads(data_str)
+            print(f"{d['chain']} {d['address']}: ${d['price']}")
+```
 
-**One invalid asset cancels the entire stream.** Validate with REST API `/search` first.
+### Stream prices, multiple tokens (POST)
+
+```
+POST /sse/prices
+Accept: text/event-stream
+Content-Type: application/json
+```
+
+Body: JSON array of `{"chain", "address", "method": "token_price"}` objects, max 25 per connection.
 
 ```python
-import requests, json
+import json, requests
 
 assets = [
-    {"chain": "ethereum", "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", "method": "t_p"},
-    {"chain": "solana", "address": "So11111111111111111111111111111111111111112", "method": "t_p"}
+  {"chain": "ethereum", "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", "method": "token_price"},
+  {"chain": "solana",   "address": "So11111111111111111111111111111111111111112",  "method": "token_price"},
 ]
 
-r = requests.post("https://streaming.dexpaprika.com/stream",
+r = requests.post("https://streaming.dexpaprika.com/sse/prices",
     headers={"Accept": "text/event-stream", "Content-Type": "application/json"},
     json=assets, stream=True)
-
-for line in r.iter_lines():
-    if line and line.startswith(b'data:'):
-        data = json.loads(line[5:])
-        print(f"{data['c']} {data['a']}: ${data['p']}")
+# Same buffer-by-blank-line parser as above; filter on event_type == "token_price".
 ```
 
-### Response format
+One invalid asset cancels the entire stream with HTTP 400. Validate addresses with REST `/search` first.
 
-Each SSE event:
+### Stream reserves (GET, single)
 
-```json
-{"a": "0xc02a...", "c": "ethereum", "p": "2739.79", "t": 1769778188, "t_p": 1769778187}
+```
+GET /sse/reserves?method=pool_reserves&chain={network}&address={pool_address}
+GET /sse/reserves?method=token_reserves&chain={network}&address={token_address}
 ```
 
-| Field | Meaning                          |
-| ----- | -------------------------------- |
-| `a`   | Token address                    |
-| `c`   | Chain ID                         |
-| `p`   | Price USD (string for precision) |
-| `t`   | Server timestamp (Unix)          |
-| `t_p` | Price timestamp (Unix)           |
+### Stream reserves (POST, multi)
 
-### Errors
+```
+POST /sse/reserves
+```
 
-`200` connected | `400` bad params / unsupported chain / asset not found | `429` capacity exceeded (retry with backoff)
+Body: JSON array of `{"chain", "address", "method": "pool_reserves"|"token_reserves"}` objects, max 25 per connection. Methods can be mixed.
 
 ---
 
-## Best Practices
+## Event types
 
-- Reconnect with exponential backoff on disconnect
-- Use POST for 10+ assets (one connection vs many)
-- Parse `p` as string/decimal to preserve precision
-- Validate assets via REST `/search` before streaming
+| Event | Where | Payload shape |
+|---|---|---|
+| `token_price` | prices feed | `{address, chain, price, timestamp, timestamp_price, token_price}` |
+| `reserve_update` | reserves feed | `{chain, pool_id, block, previous_block, tokens[], total_reserve_usd, total_delta_usd}` |
+| `ping` | both | `{"time": <unix>}` (every ~15s) |
+| `warning` | both | `{"message": "..."}` (non-fatal, e.g. deprecation) |
+| `error` | both | `{"message": "..."}` (stream-terminating) |
 
-## Common Tokens
+`token_price` payload (JSON):
+```json
+{
+  "address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+  "chain": "ethereum",
+  "price": "2145.78",
+  "timestamp": 1779110450,
+  "timestamp_price": 1779110449,
+  "token_price": 1779110449
+}
+```
 
-| Token | Chain    | Address                                      |
-| ----- | -------- | -------------------------------------------- |
+`reserve_update` payload (JSON):
+```json
+{
+  "chain": "ethereum",
+  "pool_id": "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+  "block": "25122344",
+  "tokens": [
+    {"token_id": "0xa0b8...", "reserve": "61995526164300", "delta": "103817802",
+     "price_usd": 1.0000, "reserve_usd": 61998696.43, "delta_usd": 103.82},
+    {"token_id": "0xc02a...", "reserve": "17706554631959222896552", "delta": "-48362919581328866",
+     "price_usd": 2145.78, "reserve_usd": 37994383.59, "delta_usd": -103.77}
+  ],
+  "total_reserve_usd": 99993080.03,
+  "total_delta_usd": 0.04
+}
+```
+
+The legacy `t_p` event and compact `{a, c, p, t, t_p}` shape exist on the deprecated `/stream` path only. New code should not use them.
+
+---
+
+## Wire-format gotchas
+
+- `block`, `previous_block`, `reserve`, `delta` arrive as **JSON strings**. They routinely exceed `Number.MAX_SAFE_INTEGER`. Parse with `BigInt` for arithmetic, or `Number()` for display-only. The USD fields are regular JSON numbers.
+- Both orderings of `event:` and `data:` lines within one SSE message are valid per the spec, and the server has used both during rollout. Custom parsers should buffer one message between blank-line boundaries before dispatching, not dispatch on field order.
+- `previous_block` is omitted from the payload on the first event after subscribing.
+
+---
+
+## Errors
+
+| Code | Cause | Body |
+|---|---|---|
+| 200 | Connected, streaming | (SSE event stream) |
+| 400 | Bad params, unsupported chain, asset not found, one invalid asset in a batch | `{"message": "..."}` |
+| 400 | Too many entries in POST body | `{"message":"too many assets, max 25 allowed"}` for `/sse/prices`; `{"message":"too many subscriptions"}` for `/sse/reserves` |
+| 429 | IP stream limit (10 concurrent) | `{"message":"ip stream limit exceeded"}` |
+
+In-stream errors arrive as `event: error` SSE messages and terminate the stream.
+
+---
+
+## Best practices
+
+- Reconnect with exponential backoff on disconnect.
+- Use POST for multi-asset subscriptions (one connection instead of many), up to 25 entries.
+- Parse `price` as a string for decimal precision. Don't `parseFloat` and re-serialize.
+- Filter on the `event:` line. Treat unknown events as no-ops so future server-side additions don't break the handler.
+- Use `BigInt` (or `int`) for raw integer fields when you need arithmetic.
+- Open parallel connections if you need more than 25 subscriptions, up to the 10/IP cap.
+- Validate addresses via REST `/search` before streaming.
+
+---
+
+## Common identifiers
+
+| Token | Chain    | Address |
+| ----- | -------- | ------- |
 | WETH  | ethereum | `0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2` |
 | USDC  | ethereum | `0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48` |
-| SOL   | solana   | `So11111111111111111111111111111111111111112`  |
+| USDT  | ethereum | `0xdac17f958d2ee523a2206206994597c13d831ec7` |
+| WBTC  | ethereum | `0x2260fac5e5542a773aa44fbcfedf7c193bc2c599` |
+| SOL   | solana   | `So11111111111111111111111111111111111111112` |
+| USDC  | solana   | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` |
+| WBNB  | bsc      | `0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c` |
+
+Common pools (for reserves streaming):
+
+| Pair | Chain | DEX | Pool address |
+|---|---|---|---|
+| USDC/WETH (0.05%) | ethereum | Uniswap V3 | `0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640` |
+| USDC/WETH (0.30%) | ethereum | Uniswap V3 | `0xe0554a476a092703abdb3ef35c80e0d76d32939f` |
+
+Find others via REST API `/networks/{chain}/tokens/{address}/pools`.
+
+---
+
+## Deprecated paths
+
+`/stream` and `/reserves/stream` are predecessors. `/stream` still works but emits a one-shot `warning` event on connect telling clients to migrate to `/sse/prices`. `/reserves/stream` was retired and now returns 404. New code must use `/sse/prices` and `/sse/reserves`.
+
+---
 
 ## Troubleshooting
 
-- **This skill doesn't cover your use case?** Fetch the full docs at <https://docs.dexpaprika.com/streaming>
-- **Need REST API (historical data, search, pools)?** See `https://dexpaprika.com/agents/skill.md`
-- **Still stuck?** Contact support@coinpaprika.com
+- **This skill doesn't cover your case?** Full docs at <https://docs.dexpaprika.com/streaming/introduction>.
+- **Reserves deep dive?** <https://docs.dexpaprika.com/streaming/reserves-streaming>.
+- **Need REST (historical data, search, pools)?** See `https://dexpaprika.com/agents/skill.md`.
+- **Still stuck?** Contact support@coinpaprika.com.

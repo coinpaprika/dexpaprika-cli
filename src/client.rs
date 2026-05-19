@@ -45,7 +45,9 @@ impl ApiClient {
                     bail!("Not found. Check the network ID and address. API response: {body}");
                 }
                 s if s.is_server_error() => {
-                    bail!("DexPaprika API is temporarily unavailable. Try again shortly. ({status})");
+                    bail!(
+                        "DexPaprika API is temporarily unavailable. Try again shortly. ({status})"
+                    );
                 }
                 _ => {
                     bail!("DexPaprika API error {status}: {body}");

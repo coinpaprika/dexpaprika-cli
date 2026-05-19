@@ -1,6 +1,6 @@
+use crate::output::OutputFormat;
 use anyhow::Result;
 use serde::Serialize;
-use crate::output::OutputFormat;
 
 #[derive(Serialize)]
 struct AttributionData {
@@ -44,7 +44,11 @@ pub fn execute(output: OutputFormat, raw: bool) -> Result<()> {
                 markdown: "[Powered by DexPaprika](https://dexpaprika.com)".into(),
                 badge: "https://img.shields.io/badge/data-DexPaprika-blue".into(),
             };
-            crate::output::print_json_wrapped(&data, crate::output::ResponseMeta::dexpaprika("/attribution"), raw)?;
+            crate::output::print_json_wrapped(
+                &data,
+                crate::output::ResponseMeta::dexpaprika("/attribution"),
+                raw,
+            )?;
         }
     }
     Ok(())

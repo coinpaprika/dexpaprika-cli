@@ -34,24 +34,41 @@ pub async fn execute_networks(client: &ApiClient, output: OutputFormat, raw: boo
     match output {
         OutputFormat::Table => crate::output::networks::print_networks_table(&networks),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&networks, crate::output::ResponseMeta::dexpaprika("/networks"), raw)?;
+            crate::output::print_json_wrapped(
+                &networks,
+                crate::output::ResponseMeta::dexpaprika("/networks"),
+                raw,
+            )?;
         }
     }
     Ok(())
 }
 
-pub async fn execute_dexes(client: &ApiClient, network: &str, limit: usize, page: usize, output: OutputFormat, raw: bool) -> Result<()> {
+pub async fn execute_dexes(
+    client: &ApiClient,
+    network: &str,
+    limit: usize,
+    page: usize,
+    output: OutputFormat,
+    raw: bool,
+) -> Result<()> {
     let limit_str = limit.to_string();
     let page_str = page.to_string();
-    let resp: DexesResponse = client.dexpaprika_get(
-        &format!("/networks/{network}/dexes"),
-        &[("limit", &limit_str), ("page", &page_str)],
-    ).await?;
+    let resp: DexesResponse = client
+        .dexpaprika_get(
+            &format!("/networks/{network}/dexes"),
+            &[("limit", &limit_str), ("page", &page_str)],
+        )
+        .await?;
     let dexes = resp.dexes;
     match output {
         OutputFormat::Table => crate::output::networks::print_dexes_table(&dexes),
         OutputFormat::Json => {
-            crate::output::print_json_wrapped(&dexes, crate::output::ResponseMeta::dexpaprika(&format!("/network/{network}")), raw)?;
+            crate::output::print_json_wrapped(
+                &dexes,
+                crate::output::ResponseMeta::dexpaprika(&format!("/network/{network}")),
+                raw,
+            )?;
         }
     }
     Ok(())
