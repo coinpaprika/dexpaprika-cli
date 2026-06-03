@@ -32,6 +32,7 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 | `networks` | List all chains | `dexpaprika-cli networks` |
 | `dexes` | DEXes on a network | `dexpaprika-cli dexes ethereum` |
 | `pools` | Top pools on a network | `dexpaprika-cli pools ethereum --limit 5` |
+| `search-pools` | Advanced pool search (sort, filters, cursor) | `dexpaprika-cli search-pools --sort-by liquidity_usd --detailed` |
 | `pool` | Pool details | `dexpaprika-cli pool ethereum 0x88e6...` |
 | `dex-pools` | Pools on a specific DEX | `dexpaprika-cli dex-pools ethereum uniswap_v3` |
 | `transactions` | Recent pool transactions | `dexpaprika-cli transactions ethereum 0x88e6...` |
@@ -41,10 +42,36 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 | `prices` | Batch token prices | `dexpaprika-cli prices ethereum --tokens 0xc02a...,0xdac1...` |
 | `search` | Search everything | `dexpaprika-cli search uniswap` |
 | `stream` | Real-time SSE prices | `dexpaprika-cli stream ethereum 0xc02a...` |
+| `stream-reserves` | Real-time SSE pool/token reserves | `dexpaprika-cli stream-reserves ethereum 0x88e6... --method pool_reserves` |
 | `status` | API health check | `dexpaprika-cli status` |
 | `attribution` | Attribution snippets | `dexpaprika-cli attribution` |
 | `onboard` | Welcome & quick start | `dexpaprika-cli onboard` |
 | `shell` | Interactive REPL | `dexpaprika-cli shell` |
+
+## Advanced pool search
+
+`search-pools` hits the frontend pool-search endpoints, globally or scoped to one
+network with `--network`. Results are cursor-paged.
+
+```bash
+# Top pools by 24h volume across every chain
+dexpaprika-cli search-pools --sort-by volume_usd_24h --limit 5
+
+# Deep pools on one network, sorted by liquidity
+dexpaprika-cli search-pools --network ethereum --liquidity-usd-min 1000000 --sort-by liquidity_usd
+
+# Filter by DEX and price, with full token data (symbols, FDV, timeframe blocks)
+dexpaprika-cli search-pools --dex-name uniswap_v3 --price-usd-min 0.5 --detailed
+
+# Page forward with the cursor printed in the previous footer
+dexpaprika-cli search-pools --sort-by volume_usd_7d --cursor eyJjaGFpbiI6...
+```
+
+Sort with `--sort-by` (one of `volume_usd_24h`, `volume_usd_7d`, `volume_usd_30d`,
+`liquidity_usd`, `txns_24h`, `price_usd`, `price_change_percentage_24h`, `created_at`)
+and `--sort-dir` (`asc`/`desc`). Filters: `--volume-24h-min/max`, `--volume-7d-min/max`,
+`--liquidity-usd-min/max`, `--txns-24h-min`, `--price-usd-min/max`,
+`--price-change-percentage-24h-min/max`, `--dex-name`, `--created-after/before`.
 
 ## Streaming
 
@@ -60,6 +87,34 @@ dexpaprika-cli stream --tokens watchlist.json --limit 100
 # Stop after N events
 dexpaprika-cli stream ethereum 0xc02a... --limit 50
 ```
+
+## Streaming reserves
+
+`stream-reserves` tails block-level reserve changes over SSE. Two methods, each
+with its own event:
+
+- `pool_reserves` — one pool. Emits a `pool_reserves` event with a nested `tokens`
+  array plus `timestamp` and `block_timestamp`.
+- `token_reserves` — one token across every pool that holds it (high volume on
+  majors like USDC). Emits a `token_reserves` event with a single flat token plus
+  `updated_at` and `timestamp`.
+
+```bash
+# One pool
+dexpaprika-cli stream-reserves ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --method pool_reserves
+
+# One token across all its pools, with a correlation id echoed on every event
+dexpaprika-cli stream-reserves ethereum 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 \
+  --method token_reserves --request-id 7 --limit 10
+
+# Many targets from a file
+dexpaprika-cli stream-reserves --subscriptions reserves.json
+```
+
+Pass `--request-id <0..4294967295>` (single stream) or a per-entry `request_id`
+in the subscriptions file (multi stream) to correlate events; it is echoed back on
+each data event and defaults to the array index when omitted in a file. Raw integer
+fields (`reserve`, `delta`, `block`) arrive as JSON strings to preserve precision.
 
 ## Output formats
 

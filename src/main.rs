@@ -126,6 +126,84 @@ enum Commands {
         page: usize,
     },
 
+    /// Advanced pool search across all chains (or one network) with sort, filters, and cursor paging
+    #[command(
+        name = "search-pools",
+        after_help = "EXAMPLES:\n  \
+        dexpaprika-cli search-pools --sort-by volume_usd_24h --limit 5\n  \
+        dexpaprika-cli search-pools --network ethereum --liquidity-usd-min 1000000 --sort-by liquidity_usd\n  \
+        dexpaprika-cli search-pools --dex-name uniswap_v3 --price-usd-min 0.5 --detailed\n  \
+        dexpaprika-cli search-pools --sort-by volume_usd_7d --cursor eyJjaGFpbiI6...\n\n\
+        SORT-BY FIELDS:\n  \
+        volume_usd_24h, volume_usd_7d, volume_usd_30d, liquidity_usd, txns_24h,\n  \
+        price_usd, price_change_percentage_24h, created_at\n\n\
+        PAGING:\n  \
+        Responses are cursor-based. When more results exist, the table footer prints the\n  \
+        --cursor value to pass on the next call. created-after/before accept RFC3339 or yyyy-mm-dd."
+    )]
+    SearchPools {
+        /// Scope to one network (e.g. ethereum, solana). Omit to search every chain.
+        #[arg(long)]
+        network: Option<String>,
+        /// Sort field (canonical name; translated to the wire order_by)
+        #[arg(long, default_value = "volume_usd_24h")]
+        sort_by: String,
+        /// Sort direction: asc or desc (translated to the wire sort)
+        #[arg(long, default_value = "desc")]
+        sort_dir: String,
+        /// Maximum number of results
+        #[arg(long, default_value = "10")]
+        limit: usize,
+        /// Cursor for the next page (from a previous response's next_cursor)
+        #[arg(long)]
+        cursor: Option<String>,
+        /// Include full token data: symbols, FDV, and per-timeframe volume blocks
+        #[arg(long)]
+        detailed: bool,
+        /// Minimum 24h volume in USD
+        #[arg(long)]
+        volume_24h_min: Option<f64>,
+        /// Maximum 24h volume in USD
+        #[arg(long)]
+        volume_24h_max: Option<f64>,
+        /// Minimum 7d volume in USD
+        #[arg(long)]
+        volume_7d_min: Option<f64>,
+        /// Maximum 7d volume in USD
+        #[arg(long)]
+        volume_7d_max: Option<f64>,
+        /// Minimum pool liquidity in USD
+        #[arg(long)]
+        liquidity_usd_min: Option<f64>,
+        /// Maximum pool liquidity in USD
+        #[arg(long)]
+        liquidity_usd_max: Option<f64>,
+        /// Minimum transactions in 24h
+        #[arg(long)]
+        txns_24h_min: Option<u64>,
+        /// Minimum token price in USD
+        #[arg(long)]
+        price_usd_min: Option<f64>,
+        /// Maximum token price in USD
+        #[arg(long)]
+        price_usd_max: Option<f64>,
+        /// Minimum 24h price change percentage
+        #[arg(long)]
+        price_change_percentage_24h_min: Option<f64>,
+        /// Maximum 24h price change percentage
+        #[arg(long)]
+        price_change_percentage_24h_max: Option<f64>,
+        /// Filter by DEX identifier (e.g. uniswap_v3)
+        #[arg(long)]
+        dex_name: Option<String>,
+        /// Only pools created after this date (RFC3339 or yyyy-mm-dd)
+        #[arg(long)]
+        created_after: Option<String>,
+        /// Only pools created before this date (RFC3339 or yyyy-mm-dd)
+        #[arg(long)]
+        created_before: Option<String>,
+    },
+
     /// Get detailed info about a specific pool
     #[command(
         after_help = "EXAMPLES:\n  dexpaprika-cli pool ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640"
@@ -372,11 +450,14 @@ enum Commands {
         dexpaprika-cli stream-reserves ethereum 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 --method token_reserves --limit 10\n  \
         dexpaprika-cli stream-reserves --subscriptions reserves.json\n\n\
         METHODS:\n  \
-        pool_reserves    Subscribe to one specific pool (events fire when that pool's reserves change)\n  \
-        token_reserves   Subscribe to one token (events fire for every pool containing it; high volume on USDC etc)\n\n\
+        pool_reserves    Subscribe to one specific pool (fires a 'pool_reserves' event with a nested tokens array when reserves change)\n  \
+        token_reserves   Subscribe to one token (fires a 'token_reserves' event per pool containing it; high volume on USDC etc)\n\n\
         SUBSCRIPTIONS FILE FORMAT (JSON array, up to 25 entries per connection):\n  \
-        [{\"chain\": \"ethereum\", \"address\": \"0x88e6...\", \"method\": \"pool_reserves\"},\n   \
+        [{\"chain\": \"ethereum\", \"address\": \"0x88e6...\", \"method\": \"pool_reserves\", \"request_id\": 1},\n   \
          {\"chain\": \"ethereum\", \"address\": \"0xa0b8...\", \"method\": \"token_reserves\"}]\n\n\
+        REQUEST ID:\n  \
+        --request-id (single) or per-entry \"request_id\" (multi) is an optional uint32 (0..4294967295)\n  \
+        echoed back on each data event. In the file form it defaults to the array index when omitted.\n\n\
         WIRE NOTES:\n  \
         reserve/delta/block/previous_block come as JSON strings (precision-safe). Parse with BigInt if you need arithmetic on raw integers.\n  \
         USD fields (reserve_usd, delta_usd, total_delta_usd, etc.) are regular numbers."
@@ -392,7 +473,10 @@ enum Commands {
         /// Path to JSON file with subscriptions (for multi-target stream, max 25 entries)
         #[arg(long)]
         subscriptions: Option<String>,
-        /// Stop after N reserve_update events (default: unlimited, Ctrl+C to stop)
+        /// Correlation id (uint32, 0..4294967295) echoed back on each data event (single-target stream)
+        #[arg(long)]
+        request_id: Option<u32>,
+        /// Stop after N data events (default: unlimited, Ctrl+C to stop)
         #[arg(long)]
         limit: Option<usize>,
     },
@@ -477,6 +561,58 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
                 &sort_dir,
                 limit,
                 page,
+                output,
+                raw,
+            )
+            .await
+        }
+        Commands::SearchPools {
+            network,
+            sort_by,
+            sort_dir,
+            limit,
+            cursor,
+            detailed,
+            volume_24h_min,
+            volume_24h_max,
+            volume_7d_min,
+            volume_7d_max,
+            liquidity_usd_min,
+            liquidity_usd_max,
+            txns_24h_min,
+            price_usd_min,
+            price_usd_max,
+            price_change_percentage_24h_min,
+            price_change_percentage_24h_max,
+            dex_name,
+            created_after,
+            created_before,
+        } => {
+            let filters = commands::search_pools::SearchPoolsFilters {
+                volume_24h_min,
+                volume_24h_max,
+                volume_7d_min,
+                volume_7d_max,
+                liquidity_usd_min,
+                liquidity_usd_max,
+                txns_24h_min,
+                price_usd_min,
+                price_usd_max,
+                price_change_percentage_24h_min,
+                price_change_percentage_24h_max,
+                dex_name,
+                created_after,
+                created_before,
+            };
+            commands::search_pools::execute(
+                &client,
+                network.as_deref(),
+                &sort_by,
+                &sort_dir,
+                &filters,
+                limit,
+                cursor.as_deref(),
+                detailed,
                 output,
                 raw,
             )
@@ -651,6 +787,7 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
             address,
             method,
             subscriptions,
+            request_id,
             limit,
         } => {
             commands::stream_reserves::execute(
@@ -659,6 +796,7 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
                 address.as_deref(),
                 &method,
                 subscriptions.as_deref(),
+                request_id,
                 limit,
                 output,
             )

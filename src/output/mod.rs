@@ -130,6 +130,7 @@ pub(crate) use detail_field;
 pub mod networks;
 pub mod pools;
 pub mod search;
+pub mod search_pools;
 pub mod stats;
 pub mod status;
 pub mod stream;
