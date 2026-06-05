@@ -372,11 +372,14 @@ enum Commands {
         dexpaprika-cli stream-reserves ethereum 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 --method token_reserves --limit 10\n  \
         dexpaprika-cli stream-reserves --subscriptions reserves.json\n\n\
         METHODS:\n  \
-        pool_reserves    Subscribe to one specific pool (events fire when that pool's reserves change)\n  \
-        token_reserves   Subscribe to one token (events fire for every pool containing it; high volume on USDC etc)\n\n\
+        pool_reserves    Subscribe to one specific pool (fires a 'pool_reserves' event with a nested tokens array when reserves change)\n  \
+        token_reserves   Subscribe to one token (fires a 'token_reserves' event per pool containing it; high volume on USDC etc)\n\n\
         SUBSCRIPTIONS FILE FORMAT (JSON array, up to 25 entries per connection):\n  \
-        [{\"chain\": \"ethereum\", \"address\": \"0x88e6...\", \"method\": \"pool_reserves\"},\n   \
+        [{\"chain\": \"ethereum\", \"address\": \"0x88e6...\", \"method\": \"pool_reserves\", \"request_id\": 1},\n   \
          {\"chain\": \"ethereum\", \"address\": \"0xa0b8...\", \"method\": \"token_reserves\"}]\n\n\
+        REQUEST ID:\n  \
+        --request-id (single) or per-entry \"request_id\" (multi) is an optional uint32 (0..4294967295)\n  \
+        echoed back on each data event. In the file form it defaults to the array index when omitted.\n\n\
         WIRE NOTES:\n  \
         reserve/delta/block/previous_block come as JSON strings (precision-safe). Parse with BigInt if you need arithmetic on raw integers.\n  \
         USD fields (reserve_usd, delta_usd, total_delta_usd, etc.) are regular numbers."
@@ -392,7 +395,10 @@ enum Commands {
         /// Path to JSON file with subscriptions (for multi-target stream, max 25 entries)
         #[arg(long)]
         subscriptions: Option<String>,
-        /// Stop after N reserve_update events (default: unlimited, Ctrl+C to stop)
+        /// Correlation id (uint32, 0..4294967295) echoed back on each data event (single-target stream)
+        #[arg(long)]
+        request_id: Option<u32>,
+        /// Stop after N data events (default: unlimited, Ctrl+C to stop)
         #[arg(long)]
         limit: Option<usize>,
     },
@@ -651,6 +657,7 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
             address,
             method,
             subscriptions,
+            request_id,
             limit,
         } => {
             commands::stream_reserves::execute(
@@ -659,6 +666,7 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
                 address.as_deref(),
                 &method,
                 subscriptions.as_deref(),
+                request_id,
                 limit,
                 output,
             )

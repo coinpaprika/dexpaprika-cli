@@ -41,6 +41,7 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 | `prices` | Batch token prices | `dexpaprika-cli prices ethereum --tokens 0xc02a...,0xdac1...` |
 | `search` | Search everything | `dexpaprika-cli search uniswap` |
 | `stream` | Real-time SSE prices | `dexpaprika-cli stream ethereum 0xc02a...` |
+| `stream-reserves` | Real-time SSE pool/token reserves | `dexpaprika-cli stream-reserves ethereum 0x88e6... --method pool_reserves` |
 | `status` | API health check | `dexpaprika-cli status` |
 | `attribution` | Attribution snippets | `dexpaprika-cli attribution` |
 | `onboard` | Welcome & quick start | `dexpaprika-cli onboard` |
@@ -60,6 +61,34 @@ dexpaprika-cli stream --tokens watchlist.json --limit 100
 # Stop after N events
 dexpaprika-cli stream ethereum 0xc02a... --limit 50
 ```
+
+## Streaming reserves
+
+`stream-reserves` tails block-level reserve changes over SSE. Two methods, each
+with its own event:
+
+- `pool_reserves` — one pool. Emits a `pool_reserves` event with a nested `tokens`
+  array plus `timestamp` and `block_timestamp`.
+- `token_reserves` — one token across every pool that holds it (high volume on
+  majors like USDC). Emits a `token_reserves` event with a single flat token plus
+  `updated_at` and `timestamp`.
+
+```bash
+# One pool
+dexpaprika-cli stream-reserves ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --method pool_reserves
+
+# One token across all its pools, with a correlation id echoed on every event
+dexpaprika-cli stream-reserves ethereum 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 \
+  --method token_reserves --request-id 7 --limit 10
+
+# Many targets from a file
+dexpaprika-cli stream-reserves --subscriptions reserves.json
+```
+
+Pass `--request-id <0..4294967295>` (single stream) or a per-entry `request_id`
+in the subscriptions file (multi stream) to correlate events; it is echoed back on
+each data event and defaults to the array index when omitted in a file. Raw integer
+fields (`reserve`, `delta`, `block`) arrive as JSON strings to preserve precision.
 
 ## Output formats
 
