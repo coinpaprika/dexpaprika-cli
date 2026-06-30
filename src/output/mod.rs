@@ -119,6 +119,20 @@ pub fn print_dexpaprika_footer() {
     println!("\n Data: DexPaprika (dexpaprika.com) \u{00b7} Free API: api.dexpaprika.com");
 }
 
+/// Print a cursor-pagination hint for the unified search endpoints. The search
+/// API is cursor-based (no page numbers), so when more results exist we surface
+/// the opaque cursor the caller can pass to fetch the next page.
+pub fn print_more_results_hint(has_next_page: Option<bool>, next_cursor: Option<&str>) {
+    if has_next_page == Some(true) {
+        match next_cursor {
+            Some(c) if !c.is_empty() => {
+                println!("  More results available. next_cursor: {c}");
+            }
+            _ => println!("  More results available."),
+        }
+    }
+}
+
 macro_rules! detail_field {
     ($rows:expr, $label:expr, $val:expr) => {
         $rows.push([$label.into(), $val]);

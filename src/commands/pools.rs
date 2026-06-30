@@ -121,23 +121,38 @@ pub struct PoolOhlcv {
     pub volume: Option<f64>,
 }
 
-/// Wrapper for pool filter responses (uses "results" key, not "pools")
+/// Unified response for the cursor-paginated `/networks/{network}/pools/search`
+/// endpoint. Backs both the pool list and the pool filter commands.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct PoolFilterResponse {
-    pub results: Vec<PoolFilterItem>,
-    pub page_info: Option<crate::commands::tokens::PageInfo>,
+pub struct PoolSearchResponse {
+    #[serde(default)]
+    pub results: Vec<PoolSearchItem>,
+    pub has_next_page: Option<bool>,
+    pub next_cursor: Option<String>,
 }
 
+/// A single result item from `/networks/{network}/pools/search`.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct PoolFilterItem {
-    pub address: Option<String>,
+pub struct PoolSearchItem {
+    /// Pool address (the search endpoint returns it under "id", not "address").
+    pub id: Option<String>,
     pub chain: Option<String>,
     pub dex_id: Option<String>,
+    pub dex_name: Option<String>,
+    #[serde(default)]
+    pub fee: Option<serde_json::Value>,
+    pub created_at: Option<String>,
+    pub created_at_block_number: Option<i64>,
     pub volume_usd_24h: Option<f64>,
     pub volume_usd_7d: Option<f64>,
+    pub volume_usd_30d: Option<f64>,
     pub liquidity_usd: Option<f64>,
-    pub txns_24h: Option<i64>,
-    pub created_at: Option<String>,
+    pub transactions_24h: Option<i64>,
+    pub price_usd: Option<f64>,
+    pub price_change_percentage_5m: Option<f64>,
+    pub price_change_percentage_1h: Option<f64>,
+    pub price_change_percentage_24h: Option<f64>,
+    pub tokens: Option<Vec<PoolToken>>,
 }
 
 pub async fn execute_pool_filter(
@@ -155,29 +170,30 @@ pub async fn execute_pool_filter(
     sort_by: &str,
     sort_dir: &str,
     limit: usize,
-    page: usize,
+    _page: usize,
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
     let limit_str = limit.to_string();
-    let page_str = page.to_string();
+    let order_by = crate::commands::search_mapping::map_pool_sort_field(sort_by);
+    // Search is cursor-paginated: no "page" param. "order_by" is the sort field,
+    // "sort" the direction. Legacy filter param names are mapped to canonical.
     let mut params: Vec<(&str, String)> = vec![
         ("limit", limit_str),
-        ("page", page_str),
-        ("sort_by", sort_by.to_string()),
-        ("sort_dir", sort_dir.to_string()),
+        ("order_by", order_by.to_string()),
+        ("sort", sort_dir.to_string()),
     ];
     if let Some(v) = volume_24h_min {
-        params.push(("volume_24h_min", v.to_string()));
+        params.push(("volume_usd_24h_min", v.to_string()));
     }
     if let Some(v) = volume_24h_max {
-        params.push(("volume_24h_max", v.to_string()));
+        params.push(("volume_usd_24h_max", v.to_string()));
     }
     if let Some(v) = volume_7d_min {
-        params.push(("volume_7d_min", v.to_string()));
+        params.push(("volume_usd_7d_min", v.to_string()));
     }
     if let Some(v) = volume_7d_max {
-        params.push(("volume_7d_max", v.to_string()));
+        params.push(("volume_usd_7d_max", v.to_string()));
     }
     if let Some(v) = liquidity_usd_min {
         params.push(("liquidity_usd_min", v.to_string()));
@@ -196,27 +212,20 @@ pub async fn execute_pool_filter(
     }
 
     let param_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
-    let resp: PoolFilterResponse = client
-        .dexpaprika_get(&format!("/networks/{network}/pools/filter"), &param_refs)
+    let resp: PoolSearchResponse = client
+        .dexpaprika_get(&format!("/networks/{network}/pools/search"), &param_refs)
         .await?;
 
     match output {
         OutputFormat::Table => {
             crate::output::pools::print_pool_filter_table(&resp.results);
-            if let Some(pi) = &resp.page_info {
-                println!(
-                    "  Page {}/{} ({} pools total)",
-                    pi.page.unwrap_or(0),
-                    pi.total_pages.unwrap_or(0),
-                    pi.total_items.unwrap_or(0)
-                );
-            }
+            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
         }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
                 &resp,
                 crate::output::ResponseMeta::dexpaprika(&format!(
-                    "/networks/{network}/pools/filter"
+                    "/networks/{network}/pools/search"
                 )),
                 raw,
             )?;
@@ -229,32 +238,36 @@ pub async fn execute_pools(
     client: &ApiClient,
     network: &str,
     limit: usize,
-    page: usize,
+    _page: usize,
     order_by: &str,
     sort: &str,
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
     let limit_str = limit.to_string();
-    let page_str = page.to_string();
-    let resp: PoolsResponse = client
+    let order_by = crate::commands::search_mapping::map_pool_sort_field(order_by);
+    // Search is cursor-paginated: drop "page", map the sort field to canonical.
+    let resp: PoolSearchResponse = client
         .dexpaprika_get(
-            &format!("/networks/{network}/pools"),
+            &format!("/networks/{network}/pools/search"),
             &[
-                ("limit", &limit_str),
-                ("page", &page_str),
+                ("limit", limit_str.as_str()),
                 ("order_by", order_by),
                 ("sort", sort),
             ],
         )
         .await?;
-    let pools = resp.pools;
     match output {
-        OutputFormat::Table => crate::output::pools::print_pools_table(&pools),
+        OutputFormat::Table => {
+            crate::output::pools::print_pool_search_table(&resp.results);
+            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
+        }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
-                &pools,
-                crate::output::ResponseMeta::dexpaprika(&format!("/network/{network}/pools")),
+                &resp,
+                crate::output::ResponseMeta::dexpaprika(&format!(
+                    "/networks/{network}/pools/search"
+                )),
                 raw,
             )?;
         }

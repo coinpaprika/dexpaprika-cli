@@ -102,160 +102,71 @@ pub struct TokenPrice {
     pub price_usd: Option<f64>,
 }
 
-// --- Token filter types (for GET /networks/{network}/tokens/filter) ---
+// --- Unified token search types (for GET /networks/{network}/tokens/search) ---
 
+/// Unified response for the cursor-paginated `/networks/{network}/tokens/search`
+/// endpoint. Backs both the top-tokens and the token-filter commands.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct TokenFilterResponse {
-    pub results: Vec<TokenFilterResult>,
-    pub page_info: Option<PageInfo>,
+pub struct TokenSearchResponse {
+    #[serde(default)]
+    pub results: Vec<TokenSearchItem>,
+    pub has_next_page: Option<bool>,
+    pub next_cursor: Option<String>,
 }
 
+/// A single result item from `/networks/{network}/tokens/search`. The shape is
+/// flat: there is no name, symbol, buys/sells, pools count, or nested time
+/// buckets, unlike the removed list endpoints.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct TokenFilterResult {
-    pub chain: Option<String>,
+pub struct TokenSearchItem {
     pub address: Option<String>,
+    pub chain: Option<String>,
+    pub created_at: Option<String>,
     pub price_usd: Option<f64>,
     pub volume_usd_24h: Option<f64>,
     pub volume_usd_7d: Option<f64>,
+    pub volume_usd_30d: Option<f64>,
     pub liquidity_usd: Option<f64>,
     pub fdv_usd: Option<f64>,
     pub txns_24h: Option<i64>,
-    pub created_at: Option<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct PageInfo {
-    pub limit: Option<i64>,
-    pub page: Option<i64>,
-    pub total_items: Option<i64>,
-    pub total_pages: Option<i64>,
-}
-
-// --- Top tokens API types (for GET /networks/{network}/tokens/top) ---
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TopTokensResponse {
-    pub tokens: Vec<TopTokenApiItem>,
-    pub page_info: Option<PageInfo>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TopTokenApiItem {
-    pub address: Option<String>,
-    pub name: Option<String>,
-    pub symbol: Option<String>,
-    pub chain: Option<String>,
-    pub decimals: Option<i64>,
-    pub has_image: Option<bool>,
-    pub price_usd: Option<f64>,
-    pub fdv: Option<f64>,
-    pub liquidity_usd: Option<f64>,
-    pub pools: Option<i64>,
-    #[serde(rename = "24h")]
-    pub h24: Option<TopTokenTimeData>,
-    #[serde(rename = "1h")]
-    pub h1: Option<TopTokenTimeData>,
-    #[serde(rename = "5m")]
-    pub m5: Option<TopTokenTimeData>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TopTokenTimeData {
-    pub volume_usd: Option<f64>,
-    pub buys: Option<i64>,
-    pub sells: Option<i64>,
-    pub txns: Option<i64>,
-    pub last_price_usd_change: Option<f64>,
-}
-
-/// Summary of a token for the top-tokens ranking (derived from full TokenDetail)
-#[derive(Debug, Serialize)]
-pub struct TopTokenEntry {
-    pub address: String,
-    pub name: String,
-    pub symbol: String,
-    pub price_usd: Option<f64>,
-    pub volume_usd_24h: Option<f64>,
-    pub change_24h: Option<f64>,
-    pub liquidity_usd: Option<f64>,
-    pub buys_24h: Option<i64>,
-    pub sells_24h: Option<i64>,
-    pub txns_24h: Option<i64>,
-    pub fdv: Option<f64>,
-    pub pools: Option<i64>,
+    pub price_change_percentage_24h: Option<f64>,
 }
 
 pub async fn execute_top_tokens(
     client: &ApiClient,
     network: &str,
     limit: usize,
-    page: usize,
+    _page: usize,
     order_by: &str,
     sort: &str,
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
     let limit_str = limit.to_string();
-    let page_str = page.to_string();
-    let resp: TopTokensResponse = client
+    let order_by = crate::commands::search_mapping::map_token_sort_field(order_by);
+    // Search is cursor-paginated: drop "page", map the sort field to canonical.
+    let resp: TokenSearchResponse = client
         .dexpaprika_get(
-            &format!("/networks/{network}/tokens/top"),
+            &format!("/networks/{network}/tokens/search"),
             &[
-                ("limit", &limit_str),
-                ("page", &page_str),
+                ("limit", limit_str.as_str()),
                 ("order_by", order_by),
                 ("sort", sort),
             ],
         )
         .await?;
 
-    let entries: Vec<TopTokenEntry> = resp
-        .tokens
-        .iter()
-        .map(|t| {
-            let (vol, change, buys, sells, txns) = match &t.h24 {
-                Some(h) => (
-                    h.volume_usd,
-                    h.last_price_usd_change,
-                    h.buys,
-                    h.sells,
-                    h.txns,
-                ),
-                None => (None, None, None, None, None),
-            };
-            TopTokenEntry {
-                address: t.address.clone().unwrap_or_default(),
-                name: t.name.clone().unwrap_or_default(),
-                symbol: t.symbol.clone().unwrap_or_default(),
-                price_usd: t.price_usd,
-                volume_usd_24h: vol,
-                change_24h: change,
-                liquidity_usd: t.liquidity_usd,
-                buys_24h: buys,
-                sells_24h: sells,
-                txns_24h: txns,
-                fdv: t.fdv,
-                pools: t.pools,
-            }
-        })
-        .collect();
-
     match output {
         OutputFormat::Table => {
-            crate::output::tokens::print_top_tokens_table(&entries);
-            if let Some(pi) = &resp.page_info {
-                println!(
-                    "  Page {}/{} ({} tokens total)",
-                    pi.page.unwrap_or(0),
-                    pi.total_pages.unwrap_or(0),
-                    pi.total_items.unwrap_or(0)
-                );
-            }
+            crate::output::tokens::print_token_search_table(&resp.results);
+            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
         }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
                 &resp,
-                crate::output::ResponseMeta::dexpaprika(&format!("/networks/{network}/tokens/top")),
+                crate::output::ResponseMeta::dexpaprika(&format!(
+                    "/networks/{network}/tokens/search"
+                )),
                 raw,
             )?;
         }
@@ -365,7 +276,7 @@ pub async fn execute_filter_tokens(
     client: &ApiClient,
     network: &str,
     limit: usize,
-    page: usize,
+    _page: usize,
     sort_by: &str,
     sort_dir: &str,
     volume_24h_min: Option<f64>,
@@ -380,19 +291,19 @@ pub async fn execute_filter_tokens(
     raw: bool,
 ) -> Result<()> {
     let limit_str = limit.to_string();
-    let page_str = page.to_string();
-
+    let order_by = crate::commands::search_mapping::map_token_sort_field(sort_by);
+    // Search is cursor-paginated: no "page". "order_by"/"sort" replace
+    // "sort_by"/"sort_dir", and legacy filter param names map to canonical.
     let mut params: Vec<(&str, String)> = vec![
         ("limit", limit_str),
-        ("page", page_str),
-        ("sort_by", sort_by.to_string()),
-        ("sort_dir", sort_dir.to_string()),
+        ("order_by", order_by.to_string()),
+        ("sort", sort_dir.to_string()),
     ];
     if let Some(v) = volume_24h_min {
-        params.push(("volume_24h_min", v.to_string()));
+        params.push(("volume_usd_24h_min", v.to_string()));
     }
     if let Some(v) = volume_24h_max {
-        params.push(("volume_24h_max", v.to_string()));
+        params.push(("volume_usd_24h_max", v.to_string()));
     }
     if let Some(v) = liquidity_usd_min {
         params.push(("liquidity_usd_min", v.to_string()));
@@ -415,27 +326,20 @@ pub async fn execute_filter_tokens(
 
     let param_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
 
-    let resp: TokenFilterResponse = client
-        .dexpaprika_get(&format!("/networks/{network}/tokens/filter"), &param_refs)
+    let resp: TokenSearchResponse = client
+        .dexpaprika_get(&format!("/networks/{network}/tokens/search"), &param_refs)
         .await?;
 
     match output {
         OutputFormat::Table => {
-            crate::output::tokens::print_token_filter_table(&resp.results);
-            if let Some(pi) = &resp.page_info {
-                println!(
-                    "  Page {}/{} ({} tokens total)",
-                    pi.page.unwrap_or(0),
-                    pi.total_pages.unwrap_or(0),
-                    pi.total_items.unwrap_or(0)
-                );
-            }
+            crate::output::tokens::print_token_search_table(&resp.results);
+            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
         }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
                 &resp,
                 crate::output::ResponseMeta::dexpaprika(&format!(
-                    "/networks/{network}/tokens/filter"
+                    "/networks/{network}/tokens/search"
                 )),
                 raw,
             )?;
