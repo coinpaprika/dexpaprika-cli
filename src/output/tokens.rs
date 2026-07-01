@@ -1,9 +1,7 @@
 use tabled::settings::Style;
 use tabled::{Table, Tabled};
 
-use crate::commands::tokens::{
-    TokenDetail, TokenFilterResult, TokenPoolItem, TokenPrice, TopTokenEntry,
-};
+use crate::commands::tokens::{TokenDetail, TokenPoolItem, TokenPrice, TokenSearchItem};
 use crate::output::{
     detail_field, format_percent, format_price, format_usd, print_detail_table,
     print_dexpaprika_footer, truncate_address,
@@ -44,7 +42,7 @@ pub fn print_token_detail(token: &TokenDetail) {
         "Total Supply",
         token
             .total_supply
-            .map(|s| format!("{:.2}", s))
+            .map(|s| format!("{s:.2}"))
             .unwrap_or_else(|| "—".into())
     );
 
@@ -176,62 +174,6 @@ pub fn print_token_detail(token: &TokenDetail) {
 }
 
 #[derive(Tabled)]
-struct TopTokenRow {
-    #[tabled(rename = "#")]
-    rank: String,
-    #[tabled(rename = "Symbol")]
-    symbol: String,
-    #[tabled(rename = "Name")]
-    name: String,
-    #[tabled(rename = "Price")]
-    price: String,
-    #[tabled(rename = "Volume (24h)")]
-    volume: String,
-    #[tabled(rename = "24h Change")]
-    change: String,
-    #[tabled(rename = "Liquidity")]
-    liquidity: String,
-    #[tabled(rename = "Buys/Sells")]
-    buys_sells: String,
-    #[tabled(rename = "Txns")]
-    txns: String,
-}
-
-pub fn print_top_tokens_table(entries: &[TopTokenEntry]) {
-    let rows: Vec<TopTokenRow> = entries
-        .iter()
-        .enumerate()
-        .map(|(i, e)| TopTokenRow {
-            rank: (i + 1).to_string(),
-            symbol: e.symbol.clone(),
-            name: crate::output::truncate(&e.name, 20),
-            price: e.price_usd.map(format_price).unwrap_or_else(|| "—".into()),
-            volume: e
-                .volume_usd_24h
-                .map(format_usd)
-                .unwrap_or_else(|| "—".into()),
-            change: e
-                .change_24h
-                .map(format_percent)
-                .unwrap_or_else(|| "—".into()),
-            liquidity: e
-                .liquidity_usd
-                .map(format_usd)
-                .unwrap_or_else(|| "—".into()),
-            buys_sells: format!("{}/{}", e.buys_24h.unwrap_or(0), e.sells_24h.unwrap_or(0)),
-            txns: e
-                .txns_24h
-                .map(|t| t.to_string())
-                .unwrap_or_else(|| "—".into()),
-        })
-        .collect();
-
-    let table = Table::new(rows).with(Style::rounded()).to_string();
-    println!("{table}");
-    print_dexpaprika_footer();
-}
-
-#[derive(Tabled)]
 struct TokenPoolRow {
     #[tabled(rename = "Pool")]
     pool: String,
@@ -294,10 +236,10 @@ struct PriceRow {
     price: String,
 }
 
-// --- Token filter table ---
+// --- Unified token search table (top-tokens + token-filter) ---
 
 #[derive(Tabled)]
-struct TokenFilterRow {
+struct TokenSearchRow {
     #[tabled(rename = "Address")]
     address: String,
     #[tabled(rename = "Chain")]
@@ -306,6 +248,8 @@ struct TokenFilterRow {
     price: String,
     #[tabled(rename = "Volume (24h)")]
     volume_24h: String,
+    #[tabled(rename = "24h Change")]
+    change: String,
     #[tabled(rename = "Liquidity")]
     liquidity: String,
     #[tabled(rename = "FDV")]
@@ -314,30 +258,37 @@ struct TokenFilterRow {
     txns: String,
 }
 
-pub fn print_token_filter_table(tokens: &[TokenFilterResult]) {
-    let rows: Vec<TokenFilterRow> = tokens
+/// Render token rows from the unified search endpoint. The flat search payload
+/// carries no name/symbol/buys/sells/pools, so only the available fields are
+/// shown. Used by both the top-tokens and token-filter commands.
+pub fn print_token_search_table(tokens: &[TokenSearchItem]) {
+    let rows: Vec<TokenSearchRow> = tokens
         .iter()
-        .map(|t| TokenFilterRow {
+        .map(|t| TokenSearchRow {
             address: t
                 .address
                 .as_deref()
                 .map(truncate_address)
-                .unwrap_or_else(|| "—".into()),
-            chain: t.chain.clone().unwrap_or_else(|| "—".into()),
-            price: t.price_usd.map(format_price).unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
+            chain: t.chain.clone().unwrap_or_else(|| "-".into()),
+            price: t.price_usd.map(format_price).unwrap_or_else(|| "-".into()),
             volume_24h: t
                 .volume_usd_24h
                 .map(format_usd)
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
+            change: t
+                .price_change_percentage_24h
+                .map(format_percent)
+                .unwrap_or_else(|| "-".into()),
             liquidity: t
                 .liquidity_usd
                 .map(format_usd)
-                .unwrap_or_else(|| "—".into()),
-            fdv: t.fdv_usd.map(format_usd).unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
+            fdv: t.fdv_usd.map(format_usd).unwrap_or_else(|| "-".into()),
             txns: t
                 .txns_24h
                 .map(|n| n.to_string())
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
         })
         .collect();
 

@@ -2,7 +2,7 @@ use tabled::settings::Style;
 use tabled::{Table, Tabled};
 
 use crate::commands::pools::{
-    PoolDetail, PoolFilterItem, PoolListItem, PoolOhlcv, PoolTransaction,
+    PoolDetail, PoolListItem, PoolOhlcv, PoolSearchItem, PoolTransaction,
 };
 use crate::output::{
     detail_field, format_percent, format_price, format_usd, print_detail_table,
@@ -78,33 +78,83 @@ struct FilterRow {
     created: String,
 }
 
-pub fn print_pool_filter_table(results: &[PoolFilterItem]) {
+pub fn print_pool_filter_table(results: &[PoolSearchItem]) {
     let rows: Vec<FilterRow> = results
         .iter()
         .map(|r| FilterRow {
             address: r
-                .address
+                .id
                 .as_deref()
                 .map(truncate_address)
-                .unwrap_or_else(|| "—".into()),
-            dex: r.dex_id.clone().unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
+            dex: r.dex_id.clone().unwrap_or_else(|| "-".into()),
             volume: r
                 .volume_usd_24h
                 .map(format_usd)
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
             liquidity: r
                 .liquidity_usd
                 .map(format_usd)
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
             txns: r
-                .txns_24h
+                .transactions_24h
                 .map(|t| t.to_string())
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
             created: r
                 .created_at
                 .as_deref()
                 .map(|s| s.chars().take(10).collect())
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
+        })
+        .collect();
+
+    let table = Table::new(rows).with(Style::rounded()).to_string();
+    println!("{table}");
+    print_dexpaprika_footer();
+}
+
+#[derive(Tabled)]
+struct PoolSearchRow {
+    #[tabled(rename = "Pool")]
+    pool: String,
+    #[tabled(rename = "DEX")]
+    dex: String,
+    #[tabled(rename = "Price")]
+    price: String,
+    #[tabled(rename = "Volume (24h)")]
+    volume: String,
+    #[tabled(rename = "Liquidity")]
+    liquidity: String,
+    #[tabled(rename = "24h Change")]
+    change: String,
+}
+
+/// Render the pool list from the unified search endpoint. The search payload
+/// carries no token symbols, so the legacy "Pair" column is replaced by
+/// "Liquidity", which the search result does provide.
+pub fn print_pool_search_table(pools: &[PoolSearchItem]) {
+    let rows: Vec<PoolSearchRow> = pools
+        .iter()
+        .map(|p| PoolSearchRow {
+            pool: p
+                .id
+                .as_deref()
+                .map(truncate_address)
+                .unwrap_or_else(|| "-".into()),
+            dex: p.dex_name.clone().unwrap_or_else(|| "-".into()),
+            price: p.price_usd.map(format_price).unwrap_or_else(|| "-".into()),
+            volume: p
+                .volume_usd_24h
+                .map(format_usd)
+                .unwrap_or_else(|| "-".into()),
+            liquidity: p
+                .liquidity_usd
+                .map(format_usd)
+                .unwrap_or_else(|| "-".into()),
+            change: p
+                .price_change_percentage_24h
+                .map(format_percent)
+                .unwrap_or_else(|| "-".into()),
         })
         .collect();
 
@@ -228,7 +278,7 @@ pub fn print_pool_detail(pool: &PoolDetail) {
         for (i, t) in tokens.iter().enumerate() {
             detail_field!(
                 rows,
-                &format!("Token {}", i),
+                &format!("Token {i}"),
                 format!(
                     "{} ({}) — {}",
                     t.name.as_deref().unwrap_or("—"),

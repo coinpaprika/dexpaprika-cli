@@ -13,10 +13,7 @@ pub fn print_dex_search(result: &DexSearchResult) {
                     .volume_usd
                     .map(|v| format!("vol {}", format_usd(v)))
                     .unwrap_or_default();
-                let change_str = t
-                    .price_usd_change
-                    .map(|c| format_percent(c))
-                    .unwrap_or_default();
+                let change_str = t.price_usd_change.map(format_percent).unwrap_or_default();
                 let extra = [price_str, vol_str, change_str]
                     .iter()
                     .filter(|s| !s.is_empty())
