@@ -2,7 +2,7 @@
 name = "dexpaprika-cli"
 version = "0.4.2"
 edition = "2021"
-description = "DexPaprika CLI — free DEX data from the terminal. Pools, tokens, on-chain trades across 33+ chains."
+description = "DexPaprika CLI: free DEX data from the terminal. Pools, tokens, on-chain trades across 36+ chains."
 license = "MIT"
 repository = "https://github.com/coinpaprika/dexpaprika-cli"
 keywords = ["dexpaprika", "dex", "defi", "cli", "cryptocurrency"]
