@@ -1,7 +1,7 @@
 use tabled::settings::Style;
 use tabled::{Table, Tabled};
 
-use crate::commands::tokens::{TokenDetail, TokenPoolItem, TokenPrice, TokenSearchItem};
+use crate::commands::tokens::{TokenDetail, TokenPrice, TokenSearchItem};
 use crate::output::{
     detail_field, format_percent, format_price, format_usd, print_detail_table,
     print_dexpaprika_footer, truncate_address,
@@ -170,59 +170,6 @@ pub fn print_token_detail(token: &TokenDetail) {
     }
 
     print_detail_table(rows);
-    print_dexpaprika_footer();
-}
-
-#[derive(Tabled)]
-struct TokenPoolRow {
-    #[tabled(rename = "Pool")]
-    pool: String,
-    #[tabled(rename = "DEX")]
-    dex: String,
-    #[tabled(rename = "Pair")]
-    pair: String,
-    #[tabled(rename = "Price")]
-    price: String,
-    #[tabled(rename = "Volume (24h)")]
-    volume: String,
-    #[tabled(rename = "Liquidity")]
-    liquidity: String,
-}
-
-pub fn print_token_pools_table(pools: &[TokenPoolItem]) {
-    let rows: Vec<TokenPoolRow> = pools
-        .iter()
-        .map(|p| {
-            let pair = p
-                .tokens
-                .as_ref()
-                .map(|ts| {
-                    ts.iter()
-                        .map(|t| t.symbol.clone().unwrap_or_else(|| "?".into()))
-                        .collect::<Vec<_>>()
-                        .join("/")
-                })
-                .unwrap_or_else(|| "—".into());
-            TokenPoolRow {
-                pool: p
-                    .id
-                    .as_deref()
-                    .map(truncate_address)
-                    .unwrap_or_else(|| "—".into()),
-                dex: p.dex_name.clone().unwrap_or_else(|| "—".into()),
-                pair,
-                price: p.price_usd.map(format_price).unwrap_or_else(|| "—".into()),
-                volume: p.volume_usd.map(format_usd).unwrap_or_else(|| "—".into()),
-                liquidity: p
-                    .liquidity_usd
-                    .map(format_usd)
-                    .unwrap_or_else(|| "—".into()),
-            }
-        })
-        .collect();
-
-    let table = Table::new(rows).with(Style::rounded()).to_string();
-    println!("{table}");
     print_dexpaprika_footer();
 }
 
