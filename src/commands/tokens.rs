@@ -68,34 +68,6 @@ pub struct TokenPeriodStats {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct TokenPoolItem {
-    pub id: Option<String>,
-    pub dex_id: Option<String>,
-    pub dex_name: Option<String>,
-    pub tokens: Option<Vec<TokenPoolToken>>,
-    pub price_usd: Option<f64>,
-    pub volume_usd: Option<f64>,
-    pub liquidity_usd: Option<f64>,
-    pub last_price_change_usd_24h: Option<f64>,
-    pub created_at: Option<String>,
-}
-
-/// Wrapper for paginated token-pools responses
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TokenPoolsResponse {
-    pub pools: Vec<TokenPoolItem>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct TokenPoolToken {
-    pub id: Option<String>,
-    pub name: Option<String>,
-    pub symbol: Option<String>,
-    #[serde(flatten)]
-    pub extra: Option<std::collections::HashMap<String, serde_json::Value>>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
 pub struct TokenPrice {
     pub id: Option<String>,
     pub chain: Option<String>,
@@ -204,33 +176,45 @@ pub async fn execute_token_pools(
     network: &str,
     token_address: &str,
     limit: usize,
-    page: usize,
+    _page: usize,
     order_by: &str,
     sort: &str,
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
     let limit_str = limit.to_string();
-    let page_str = page.to_string();
-    let resp: TokenPoolsResponse = client
+    let order_by = crate::commands::search_mapping::map_pool_sort_field(order_by);
+    // The dedicated /networks/{network}/tokens/{address}/pools endpoint was
+    // removed (HTTP 410). Its replacement is /networks/{network}/pools/search
+    // with a token_address filter, which restricts results to pools containing
+    // that token on that network. The filter is network-scoped only: the
+    // cross-network /pools/search accepts token_address but silently ignores
+    // it. An unknown address is not an error; it just returns zero results.
+    // Search is cursor-paginated, so "page" is dropped, and the sort field is
+    // mapped to canonical like the other search-backed commands. The old
+    // pair-perspective (reorder) and second-token (address) params have no
+    // search equivalent and were never exposed by this command.
+    let resp: crate::commands::pools::PoolSearchResponse = client
         .dexpaprika_get(
-            &format!("/networks/{network}/tokens/{token_address}/pools"),
+            &format!("/networks/{network}/pools/search"),
             &[
-                ("limit", &limit_str),
-                ("page", &page_str),
+                ("token_address", token_address),
+                ("limit", limit_str.as_str()),
                 ("order_by", order_by),
                 ("sort", sort),
             ],
         )
         .await?;
-    let pools = resp.pools;
     match output {
-        OutputFormat::Table => crate::output::tokens::print_token_pools_table(&pools),
+        OutputFormat::Table => {
+            crate::output::pools::print_pool_search_table(&resp.results);
+            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
+        }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
-                &pools,
+                &resp,
                 crate::output::ResponseMeta::dexpaprika(&format!(
-                    "/token/{network}/{token_address}/pools"
+                    "/networks/{network}/pools/search"
                 )),
                 raw,
             )?;
