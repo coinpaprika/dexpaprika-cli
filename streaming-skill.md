@@ -242,7 +242,7 @@ Common pools (for reserves streaming):
 | USDC/WETH (0.05%) | ethereum | Uniswap V3 | `0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640` |
 | USDC/WETH (0.30%) | ethereum | Uniswap V3 | `0xe0554a476a092703abdb3ef35c80e0d76d32939f` |
 
-Find others via REST API `/networks/{chain}/tokens/{address}/pools`.
+Find others via REST API `/networks/{chain}/pools/search?token_address={address}`.
 
 ---
 
