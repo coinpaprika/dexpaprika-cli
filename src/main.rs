@@ -11,11 +11,12 @@ use std::process::ExitCode;
 #[command(
     name = "dexpaprika-cli",
     version,
-    about = "dexpaprika-cli — Free DEX data from your terminal",
-    long_about = "dexpaprika-cli — Free DEX data from your terminal\n\n\
+    about = "dexpaprika-cli — DEX data from your terminal",
+    long_about = "dexpaprika-cli — DEX data from your terminal\n\n\
                    Pools · Tokens · On-chain trades · 36+ chains · Real-time streaming\n\n\
-                   REST API: free, no API key needed\n\
-                   Streaming: free (paid tiers coming for high-volume use)\n\n\
+                   REST API: no API key needed to start\n\
+                   Streaming: metered like REST, one update = one request\n\
+                   Plans: https://dexpaprika.com/pricing\n\n\
                    Quick start:  dexpaprika-cli onboard\n\
                    API docs:     https://api.dexpaprika.com\n\
                    Docs:         https://docs.dexpaprika.com\n\
