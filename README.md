@@ -19,8 +19,8 @@ dexpaprika-cli search uniswap
 
 ## No setup required
 
-No API key, no registration. REST API is free with reasonable rate limits.
-Streaming is free (paid tiers coming for high-volume use). Commercial use requires attribution (do-follow link).
+No API key, no registration to start. Free and paid plans are available; see [pricing](https://dexpaprika.com/pricing) for current quotas.
+Streaming is metered the same way as REST: each delivered update counts as one request. Commercial use requires attribution (do-follow link).
 
 Need higher limits or SLA? Contact support@coinpaprika.com
 

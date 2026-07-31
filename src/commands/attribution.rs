@@ -29,9 +29,9 @@ pub fn execute(output: OutputFormat, raw: bool) -> Result<()> {
             println!("  GitHub README badge:");
             println!("    [![DexPaprika](https://img.shields.io/badge/data-DexPaprika-blue)](https://dexpaprika.com)\n");
             println!("  ─── Terms ───\n");
-            println!("  REST API is free. No API key needed.");
+            println!("  No API key needed to start. See https://dexpaprika.com/pricing for plans.");
             println!("  Commercial use requires a visible do-follow link to dexpaprika.com.");
-            println!("  Streaming is free (paid tiers coming for high-volume use).\n");
+            println!("  Streaming is metered like REST: one delivered update = one request.\n");
             println!("  Need higher rate limits, SLA, or enterprise support?");
             println!("  Contact: support@coinpaprika.com");
         }

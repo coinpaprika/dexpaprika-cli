@@ -131,7 +131,7 @@ main() {
     printf '\n'
     ok "Done! Run 'dexpaprika-cli --help' to get started."
     printf '\n'
-    printf '  No API key needed. Free REST API. Just data.\n'
+    printf '  No API key needed to start. Just data.\n'
     printf '  Run: dexpaprika-cli onboard\n'
     printf '\n'
 }

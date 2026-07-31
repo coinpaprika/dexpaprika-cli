@@ -19,8 +19,9 @@ pub fn execute() -> Result<()> {
     println!("    dexpaprika-cli search uniswap             # search everything");
     println!();
     println!("  Good to know:");
-    println!("    REST API is free with reasonable rate limits.");
-    println!("    Streaming is free (paid tiers coming for high-volume use).");
+    println!("    No API key needed to start. Free and paid plans are available;");
+    println!("    see https://dexpaprika.com/pricing for the current quotas.");
+    println!("    Streaming is metered like REST: one delivered update = one request.");
     println!("    Commercial use requires attribution with a do-follow link.");
     println!("    Run dexpaprika-cli attribution for copy-paste snippets.");
     println!();
