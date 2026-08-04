@@ -26,13 +26,13 @@ pub fn print_dex_search(result: &DexSearchResult) {
                     format!("  {extra}")
                 };
                 println!(
-                    "  {} ({}) — {} [{}]{suffix}",
-                    t.name.as_deref().unwrap_or("—"),
-                    t.symbol.as_deref().unwrap_or("—"),
+                    "  {} ({}) · {} [{}]{suffix}",
+                    t.name.as_deref().unwrap_or("-"),
+                    t.symbol.as_deref().unwrap_or("-"),
                     t.id.as_deref()
                         .map(truncate_address)
-                        .unwrap_or_else(|| "—".into()),
-                    t.chain.as_deref().unwrap_or("—"),
+                        .unwrap_or_else(|| "-".into()),
+                    t.chain.as_deref().unwrap_or("-"),
                 );
             }
             println!();
@@ -60,12 +60,12 @@ pub fn print_dex_search(result: &DexSearchResult) {
                     format!("  {extra}")
                 };
                 println!(
-                    "  {} — {} [{}]{suffix}",
+                    "  {} · {} [{}]{suffix}",
                     p.id.as_deref()
                         .map(truncate_address)
-                        .unwrap_or_else(|| "—".into()),
-                    p.dex_name.as_deref().unwrap_or("—"),
-                    p.chain.as_deref().unwrap_or("—"),
+                        .unwrap_or_else(|| "-".into()),
+                    p.dex_name.as_deref().unwrap_or("-"),
+                    p.chain.as_deref().unwrap_or("-"),
                 );
             }
             println!();
@@ -77,10 +77,10 @@ pub fn print_dex_search(result: &DexSearchResult) {
             println!("DEXes:");
             for d in dexes {
                 println!(
-                    "  {} — {} [{}]",
-                    d.id.as_deref().unwrap_or("—"),
-                    d.name.as_deref().unwrap_or("—"),
-                    d.chain.as_deref().unwrap_or("—"),
+                    "  {} · {} [{}]",
+                    d.id.as_deref().unwrap_or("-"),
+                    d.name.as_deref().unwrap_or("-"),
+                    d.chain.as_deref().unwrap_or("-"),
                 );
             }
             println!();

@@ -12,22 +12,22 @@ pub fn print_token_detail(token: &TokenDetail) {
     detail_field!(
         rows,
         "Name",
-        token.name.clone().unwrap_or_else(|| "—".into())
+        token.name.clone().unwrap_or_else(|| "-".into())
     );
     detail_field!(
         rows,
         "Symbol",
-        token.symbol.clone().unwrap_or_else(|| "—".into())
+        token.symbol.clone().unwrap_or_else(|| "-".into())
     );
     detail_field!(
         rows,
         "Chain",
-        token.chain.clone().unwrap_or_else(|| "—".into())
+        token.chain.clone().unwrap_or_else(|| "-".into())
     );
     detail_field!(
         rows,
         "Address",
-        token.id.clone().unwrap_or_else(|| "—".into())
+        token.id.clone().unwrap_or_else(|| "-".into())
     );
     detail_field!(
         rows,
@@ -35,7 +35,7 @@ pub fn print_token_detail(token: &TokenDetail) {
         token
             .decimals
             .map(|d| d.to_string())
-            .unwrap_or_else(|| "—".into())
+            .unwrap_or_else(|| "-".into())
     );
     detail_field!(
         rows,
@@ -43,7 +43,7 @@ pub fn print_token_detail(token: &TokenDetail) {
         token
             .total_supply
             .map(|s| format!("{s:.2}"))
-            .unwrap_or_else(|| "—".into())
+            .unwrap_or_else(|| "-".into())
     );
 
     if let Some(desc) = &token.description {
@@ -74,12 +74,12 @@ pub fn print_token_detail(token: &TokenDetail) {
             summary
                 .price_usd
                 .map(format_price)
-                .unwrap_or_else(|| "—".into())
+                .unwrap_or_else(|| "-".into())
         );
         detail_field!(
             rows,
             "FDV",
-            summary.fdv.map(format_usd).unwrap_or_else(|| "—".into())
+            summary.fdv.map(format_usd).unwrap_or_else(|| "-".into())
         );
         detail_field!(
             rows,
@@ -87,7 +87,7 @@ pub fn print_token_detail(token: &TokenDetail) {
             summary
                 .liquidity_usd
                 .map(format_usd)
-                .unwrap_or_else(|| "—".into())
+                .unwrap_or_else(|| "-".into())
         );
         detail_field!(
             rows,
@@ -95,21 +95,21 @@ pub fn print_token_detail(token: &TokenDetail) {
             summary
                 .pools
                 .map(|p| p.to_string())
-                .unwrap_or_else(|| "—".into())
+                .unwrap_or_else(|| "-".into())
         );
 
         if let Some(h24) = &summary.h24 {
             detail_field!(
                 rows,
                 "Volume (24h)",
-                h24.volume_usd.map(format_usd).unwrap_or_else(|| "—".into())
+                h24.volume_usd.map(format_usd).unwrap_or_else(|| "-".into())
             );
             detail_field!(
                 rows,
                 "Change (24h)",
                 h24.last_price_usd_change
                     .map(format_percent)
-                    .unwrap_or_else(|| "—".into())
+                    .unwrap_or_else(|| "-".into())
             );
             detail_field!(
                 rows,
@@ -121,7 +121,7 @@ pub fn print_token_detail(token: &TokenDetail) {
                 "Txns (24h)",
                 h24.txns
                     .map(|t| t.to_string())
-                    .unwrap_or_else(|| "—".into())
+                    .unwrap_or_else(|| "-".into())
             );
         }
 
@@ -129,14 +129,14 @@ pub fn print_token_detail(token: &TokenDetail) {
             detail_field!(
                 rows,
                 "Volume (1h)",
-                h1.volume_usd.map(format_usd).unwrap_or_else(|| "—".into())
+                h1.volume_usd.map(format_usd).unwrap_or_else(|| "-".into())
             );
             detail_field!(
                 rows,
                 "Change (1h)",
                 h1.last_price_usd_change
                     .map(format_percent)
-                    .unwrap_or_else(|| "—".into())
+                    .unwrap_or_else(|| "-".into())
             );
         }
 
@@ -146,7 +146,7 @@ pub fn print_token_detail(token: &TokenDetail) {
                 "Change (5m)",
                 m5.last_price_usd_change
                     .map(format_percent)
-                    .unwrap_or_else(|| "—".into())
+                    .unwrap_or_else(|| "-".into())
             );
         }
     }
@@ -155,17 +155,17 @@ pub fn print_token_detail(token: &TokenDetail) {
         detail_field!(
             rows,
             "High (24h)",
-            ps.high_24h.map(format_price).unwrap_or_else(|| "—".into())
+            ps.high_24h.map(format_price).unwrap_or_else(|| "-".into())
         );
         detail_field!(
             rows,
             "Low (24h)",
-            ps.low_24h.map(format_price).unwrap_or_else(|| "—".into())
+            ps.low_24h.map(format_price).unwrap_or_else(|| "-".into())
         );
         detail_field!(
             rows,
             "ATH",
-            ps.ath.map(format_price).unwrap_or_else(|| "—".into())
+            ps.ath.map(format_price).unwrap_or_else(|| "-".into())
         );
     }
 
@@ -252,9 +252,9 @@ pub fn print_prices_table(prices: &[TokenPrice]) {
                 .id
                 .as_deref()
                 .map(truncate_address)
-                .unwrap_or_else(|| "—".into()),
-            chain: p.chain.clone().unwrap_or_else(|| "—".into()),
-            price: p.price_usd.map(format_price).unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
+            chain: p.chain.clone().unwrap_or_else(|| "-".into()),
+            price: p.price_usd.map(format_price).unwrap_or_else(|| "-".into()),
         })
         .collect();
 

@@ -27,15 +27,15 @@ pub fn print_networks_table(networks: &[Network]) {
             volume: n
                 .volume_usd_24h
                 .map(format_usd)
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
             txns: n
                 .txns_24h
                 .map(|t| t.to_string())
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
             pools: n
                 .pools_count
                 .map(|p| p.to_string())
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
         })
         .collect();
 
@@ -64,21 +64,21 @@ pub fn print_dexes_table(dexes: &[Dex]) {
     let rows: Vec<DexRow> = dexes
         .iter()
         .map(|d| DexRow {
-            id: d.dex_id.clone().unwrap_or_else(|| "—".into()),
-            name: d.dex_name.clone().unwrap_or_else(|| "—".into()),
-            protocol: d.protocol.clone().unwrap_or_else(|| "—".into()),
+            id: d.dex_id.clone().unwrap_or_else(|| "-".into()),
+            name: d.dex_name.clone().unwrap_or_else(|| "-".into()),
+            protocol: d.protocol.clone().unwrap_or_else(|| "-".into()),
             pools: d
                 .pools_count
                 .map(|p| p.to_string())
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
             volume: d
                 .volume_usd_24h
                 .map(format_usd)
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
             txns: d
                 .txns_24h
                 .map(|t| t.to_string())
-                .unwrap_or_else(|| "—".into()),
+                .unwrap_or_else(|| "-".into()),
         })
         .collect();
 

@@ -40,8 +40,8 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 | `token-pools` | Pools containing a token | `dexpaprika-cli token-pools ethereum 0xc02a...` |
 | `prices` | Batch token prices | `dexpaprika-cli prices ethereum --tokens 0xc02a...,0xdac1...` |
 | `search` | Search everything | `dexpaprika-cli search uniswap` |
-| `stream` | Real-time SSE prices | `dexpaprika-cli stream ethereum 0xc02a...` |
-| `stream-reserves` | Real-time SSE pool/token reserves | `dexpaprika-cli stream-reserves ethereum 0x88e6... --method pool_reserves` |
+| `stream` | SSE token price stream | `dexpaprika-cli stream ethereum 0xc02a...` |
+| `stream-reserves` | SSE pool/token reserve stream | `dexpaprika-cli stream-reserves ethereum 0x88e6... --method pool_reserves` |
 | `status` | API health check | `dexpaprika-cli status` |
 | `attribution` | Attribution snippets | `dexpaprika-cli attribution` |
 | `onboard` | Welcome & quick start | `dexpaprika-cli onboard` |
@@ -49,7 +49,9 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 
 ## Streaming
 
-SSE price feeds. Updates are swap-driven, pushed when a swap moves the price, not on a fixed cadence and not per block:
+SSE price feeds. Updates are swap-driven, pushed when a swap moves the price, not on a fixed cadence and not per block.
+
+Keyless streaming covers 36 showcase tokens, one per chain. A free API key opens streaming for any token. Either way you get up to 10 concurrent streams per IP and 25 subscriptions per POST connection. If a keyless stream connects but only ever delivers `ping` frames, the token you asked for is not one of the showcase 36:
 
 ```bash
 # Single token

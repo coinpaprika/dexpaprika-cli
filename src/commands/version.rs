@@ -82,7 +82,7 @@ pub async fn execute(output: OutputFormat, raw: bool) -> Result<()> {
             }
         }
         _ => {
-            // No releases yet or network error — assume up to date
+            // No releases yet or network error, so assume up to date
             VersionCheck {
                 current: CURRENT_VERSION.to_string(),
                 latest: CURRENT_VERSION.to_string(),
@@ -94,10 +94,10 @@ pub async fn execute(output: OutputFormat, raw: bool) -> Result<()> {
     match output {
         OutputFormat::Table => {
             if check.up_to_date {
-                println!("dexpaprika-cli v{} — up to date.", check.current);
+                println!("dexpaprika-cli v{} is up to date.", check.current);
             } else {
                 println!(
-                    "dexpaprika-cli v{} — update available: v{}\n\n  \
+                    "dexpaprika-cli v{}: update available, v{}\n\n  \
                      Update:  cargo install dexpaprika-cli\n  \
                      Release: https://github.com/coinpaprika/dexpaprika-cli/releases/latest",
                     check.current, check.latest

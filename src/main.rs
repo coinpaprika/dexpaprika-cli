@@ -365,7 +365,7 @@ enum Commands {
         limit: Option<usize>,
     },
 
-    /// Stream real-time pool reserves via SSE (block-level deltas with USD prices)
+    /// Stream pool reserve changes via SSE, emitted when a swap moves the reserves (USD-denominated deltas)
     #[command(
         name = "stream-reserves",
         after_help = "EXAMPLES:\n  \

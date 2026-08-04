@@ -1,11 +1,12 @@
 # DexPaprika Streaming Skill (CLI)
 
-Two SSE feeds, one transport. Free tier, no API key needed to start.
+Two SSE feeds, one transport. Free tier, no API key needed to start. Keyless streaming
+covers 36 showcase tokens, one per chain; a free API key opens streaming for any token.
 
 - `dexpaprika-cli stream …` for live token prices (`/sse/prices`).
 - `dexpaprika-cli stream-reserves …` for pool reserves (`/sse/reserves`), emitted when a swap moves a pool's reserves.
 
-**Limits:** 25 subscriptions per POST connection. 10 concurrent SSE streams per IP. A `ping` event lands every 15s.
+**Limits:** 25 subscriptions per POST connection. 10 concurrent SSE streams per IP. A `ping` event lands every 15s. Keyless is limited to the 36 showcase tokens, one per chain.
 
 ---
 
