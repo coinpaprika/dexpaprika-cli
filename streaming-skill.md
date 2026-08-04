@@ -1,9 +1,9 @@
 # DexPaprika Streaming Skill (CLI)
 
-Two SSE feeds, one transport. No API key, no auth.
+Two SSE feeds, one transport. Free tier, no API key needed to start.
 
 - `dexpaprika-cli stream …` for live token prices (`/sse/prices`).
-- `dexpaprika-cli stream-reserves …` for block-level pool reserves (`/sse/reserves`).
+- `dexpaprika-cli stream-reserves …` for pool reserves (`/sse/reserves`), emitted when a swap moves a pool's reserves.
 
 **Limits:** 25 subscriptions per POST connection. 10 concurrent SSE streams per IP. A `ping` event lands every 15s.
 
@@ -152,7 +152,8 @@ Body: JSON array of `{"chain", "address", "method": "pool_reserves"|"token_reser
 | Event | Where | Payload shape |
 |---|---|---|
 | `token_price` | prices feed | `{address, chain, price, timestamp, timestamp_price, token_price}` |
-| `reserve_update` | reserves feed | `{chain, pool_id, block, previous_block, tokens[], total_reserve_usd, total_delta_usd}` |
+| `pool_reserves` | reserves feed | `{chain, pool_id, block, previous_block, tokens[], total_reserve_usd, total_delta_usd, timestamp, block_timestamp}` |
+| `token_reserves` | reserves feed | `{chain, token_id, reserve, delta, block, price_usd, reserve_usd, delta_usd, updated_at, timestamp}` |
 | `ping` | both | `{"time": <unix>}` (every ~15s) |
 | `warning` | both | `{"message": "..."}` (non-fatal, e.g. deprecation) |
 | `error` | both | `{"message": "..."}` (stream-terminating) |
@@ -169,7 +170,7 @@ Body: JSON array of `{"chain", "address", "method": "pool_reserves"|"token_reser
 }
 ```
 
-`reserve_update` payload (JSON):
+`pool_reserves` payload (JSON):
 ```json
 {
   "chain": "ethereum",
@@ -182,11 +183,29 @@ Body: JSON array of `{"chain", "address", "method": "pool_reserves"|"token_reser
      "price_usd": 2145.78, "reserve_usd": 37994383.59, "delta_usd": -103.77}
   ],
   "total_reserve_usd": 99993080.03,
-  "total_delta_usd": 0.04
+  "total_delta_usd": 0.04,
+  "timestamp": 1779110450,
+  "block_timestamp": 1779110447
 }
 ```
 
-The legacy `t_p` event and compact `{a, c, p, t, t_p}` shape exist on the deprecated `/stream` path only. New code should not use them.
+`token_reserves` payload (JSON), flat and single-token, with `updated_at` instead of `block_timestamp`:
+```json
+{
+  "chain": "ethereum",
+  "token_id": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+  "reserve": "1602038276073898",
+  "delta": "73537469563",
+  "block": "25236698",
+  "price_usd": 1.00009,
+  "reserve_usd": 1602184632.13,
+  "delta_usd": 73544.18,
+  "updated_at": 1780487699,
+  "timestamp": 1780487701
+}
+```
+
+The legacy single `reserve_update` event no longer exists. A consumer that matched it must switch to `pool_reserves` and `token_reserves`. The legacy `t_p` event and compact `{a, c, p, t, t_p}` shape exist on the deprecated `/stream` path only. New code should not use them.
 
 ---
 

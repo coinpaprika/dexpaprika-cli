@@ -2,8 +2,8 @@
 
 > For agents: `curl -sSL https://raw.githubusercontent.com/coinpaprika/dexpaprika-cli/main/install.sh | sh`
 
-Free DEX data from your terminal. Pools, tokens, on-chain trades across 36+ chains.
-No API key. No credit card. Just start querying.
+DEX data from your terminal. Pools, tokens, on-chain trades across 36 chains.
+Free tier: no API key, no credit card, just start querying.
 
 ## Quick start
 
@@ -19,8 +19,8 @@ dexpaprika-cli search uniswap
 
 ## No setup required
 
-No API key, no registration to start. Free and paid plans are available; see [pricing](https://dexpaprika.com/pricing) for current quotas.
-Streaming is metered the same way as REST: each delivered update counts as one request. Commercial use requires attribution (do-follow link).
+No API key, no registration to start. The free tier is 200,000 credits/month keyless per IP, or 500,000 with a free key, at 30 requests/minute, with data delayed up to 15 seconds. Pro is $99/month for 5,000,000 credits at 300/minute with real-time data; see [pricing](https://dexpaprika.com/pricing).
+Streaming is metered the same way as REST: each delivered update counts as one credit. Commercial use requires attribution (do-follow link).
 
 Need higher limits or SLA? Contact support@coinpaprika.com
 
@@ -49,7 +49,7 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 
 ## Streaming
 
-Real-time SSE price feeds with ~1s updates:
+SSE price feeds. Updates are swap-driven, pushed when a swap moves the price, not on a fixed cadence and not per block:
 
 ```bash
 # Single token
@@ -64,12 +64,12 @@ dexpaprika-cli stream ethereum 0xc02a... --limit 50
 
 ## Streaming reserves
 
-`stream-reserves` tails block-level reserve changes over SSE. Two methods, each
+`stream-reserves` tails reserve changes over SSE, emitted when a swap moves a pool's reserves. Two methods, each
 with its own event:
 
-- `pool_reserves` — one pool. Emits a `pool_reserves` event with a nested `tokens`
+- `pool_reserves`: one pool. Emits a `pool_reserves` event with a nested `tokens`
   array plus `timestamp` and `block_timestamp`.
-- `token_reserves` — one token across every pool that holds it (high volume on
+- `token_reserves`: one token across every pool that holds it (high volume on
   majors like USDC). Emits a `token_reserves` event with a single flat token plus
   `updated_at` and `timestamp`.
 
