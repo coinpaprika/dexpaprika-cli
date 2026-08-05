@@ -144,19 +144,20 @@ enum Commands {
     /// List pools on a specific DEX
     #[command(
         name = "dex-pools",
-        after_help = "EXAMPLES:\n  dexpaprika-cli dex-pools ethereum uniswap_v3 --limit 5"
+        after_help = "EXAMPLES:\n  dexpaprika-cli dex-pools ethereum uniswap_v3 --limit 5\n  dexpaprika-cli dex-pools ethereum curve --limit 5 --cursor eyJjaGFpbiI6...\n\nNOTE: results are cursor-paginated. Pass the next_cursor printed under the\ntable to --cursor to fetch the next page."
     )]
     DexPools {
         /// Network ID
         network: String,
-        /// DEX identifier (e.g., uniswap_v3, sushiswap)
+        /// DEX identifier from `dexpaprika-cli dexes <network>` (e.g., uniswap_v3, curve).
+        /// The display name ("Uniswap V3") also works.
         dex: String,
         /// Maximum number of results (max 100)
         #[arg(long, default_value = "10")]
         limit: usize,
-        /// Page number (1-indexed)
-        #[arg(long, default_value = "1")]
-        page: usize,
+        /// Cursor for the next page, taken from the previous response
+        #[arg(long)]
+        cursor: Option<String>,
         /// Order by field
         #[arg(long, default_value = "volume_usd")]
         order_by: String,
@@ -508,12 +509,20 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
             network,
             dex,
             limit,
-            page,
+            cursor,
             order_by,
             sort,
         } => {
             commands::pools::execute_dex_pools(
-                &client, &network, &dex, limit, page, &order_by, &sort, output, raw,
+                &client,
+                &network,
+                &dex,
+                limit,
+                cursor.as_deref(),
+                &order_by,
+                &sort,
+                output,
+                raw,
             )
             .await
         }
@@ -701,4 +710,58 @@ async fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dex_pools_keeps_the_positional_dex_and_takes_a_cursor() {
+        let cli = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "dex-pools",
+            "ethereum",
+            "uniswap_v3",
+            "--limit",
+            "5",
+            "--cursor",
+            "eyJjaGFpbiI6ImV0aGVyZXVtIn0",
+        ])
+        .expect("dex-pools must still take network and dex positionally");
+
+        match cli.command {
+            Commands::DexPools {
+                network,
+                dex,
+                limit,
+                cursor,
+                ..
+            } => {
+                assert_eq!(network, "ethereum");
+                assert_eq!(dex, "uniswap_v3");
+                assert_eq!(limit, 5);
+                assert_eq!(cursor.as_deref(), Some("eyJjaGFpbiI6ImV0aGVyZXVtIn0"));
+            }
+            _ => panic!("expected the dex-pools subcommand"),
+        }
+    }
+
+    #[test]
+    fn dex_pools_no_longer_accepts_a_page_number() {
+        // pools/search is cursor-paginated. Accepting --page and ignoring it
+        // would hand back page 1 while the caller thinks they asked for page 2.
+        let parsed = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "dex-pools",
+            "ethereum",
+            "uniswap_v3",
+            "--page",
+            "2",
+        ]);
+        assert!(
+            parsed.is_err(),
+            "--page must be rejected, not silently dropped"
+        );
+    }
 }

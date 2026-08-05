@@ -4,31 +4,6 @@ use serde::{Deserialize, Serialize};
 use crate::client::ApiClient;
 use crate::output::OutputFormat;
 
-/// Wrapper for paginated pool list responses
-#[derive(Debug, Deserialize, Serialize)]
-pub struct PoolsResponse {
-    pub pools: Vec<PoolListItem>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct PoolListItem {
-    pub id: Option<String>,
-    pub chain: Option<String>,
-    pub dex_id: Option<String>,
-    pub dex_name: Option<String>,
-    #[serde(default)]
-    pub fee: Option<serde_json::Value>,
-    pub created_at: Option<String>,
-    pub created_at_block_number: Option<i64>,
-    pub volume_usd: Option<f64>,
-    pub transactions: Option<serde_json::Value>,
-    pub price_usd: Option<f64>,
-    pub last_price_change_usd_5m: Option<f64>,
-    pub last_price_change_usd_1h: Option<f64>,
-    pub last_price_change_usd_24h: Option<f64>,
-    pub tokens: Option<Vec<PoolToken>>,
-}
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PoolToken {
     /// Token contract address (DexPaprika uses "id" for address in pool tokens)
@@ -306,37 +281,50 @@ pub async fn execute_pool_detail(
     Ok(())
 }
 
+/// List the pools of a single DEX.
+///
+/// `/networks/{network}/dexes/{dex}/pools` was removed and returns HTTP 410, so
+/// the DEX moved out of the path and into the `dex_name` query parameter on
+/// `/networks/{network}/pools/search`. The parameter resolves both forms, the
+/// dex id ("uniswap_v3") and the display name ("Uniswap V3"); the CLI passes
+/// whatever the user typed straight through. Search is cursor-paginated, so the
+/// old `page` number is gone and `cursor` takes its place.
 pub async fn execute_dex_pools(
     client: &ApiClient,
     network: &str,
     dex: &str,
     limit: usize,
-    page: usize,
+    cursor: Option<&str>,
     order_by: &str,
     sort: &str,
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
     let limit_str = limit.to_string();
-    let page_str = page.to_string();
-    let resp: PoolsResponse = client
-        .dexpaprika_get(
-            &format!("/networks/{network}/dexes/{dex}/pools"),
-            &[
-                ("limit", &limit_str),
-                ("page", &page_str),
-                ("order_by", order_by),
-                ("sort", sort),
-            ],
-        )
+    let order_by = crate::commands::search_mapping::map_pool_sort_field(order_by);
+    let mut params: Vec<(&str, &str)> = vec![
+        ("limit", limit_str.as_str()),
+        ("dex_name", dex),
+        ("order_by", order_by),
+        ("sort", sort),
+    ];
+    if let Some(c) = cursor {
+        params.push(("cursor", c));
+    }
+    let resp: PoolSearchResponse = client
+        .dexpaprika_get(&format!("/networks/{network}/pools/search"), &params)
         .await?;
-    let pools = resp.pools;
     match output {
-        OutputFormat::Table => crate::output::pools::print_pools_table(&pools),
+        OutputFormat::Table => {
+            crate::output::pools::print_pool_search_table(&resp.results);
+            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
+        }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
-                &pools,
-                crate::output::ResponseMeta::dexpaprika(&format!("/dex/{network}/{dex}/pools")),
+                &resp,
+                crate::output::ResponseMeta::dexpaprika(&format!(
+                    "/networks/{network}/pools/search"
+                )),
                 raw,
             )?;
         }
@@ -445,4 +433,77 @@ pub async fn execute_ohlcv(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// One result object, copied verbatim from a live
+    /// `/networks/ethereum/pools/search?limit=2&dex_name=curve` response
+    /// captured on 2026-08-05. Field names come off the wire, not from docs.
+    const LIVE_DEX_POOLS_SAMPLE: &str = r#"{
+      "results": [
+        {
+          "id": "0x4f493b7de8aac7d55f71853688b1f7c8f0243c85",
+          "dex_id": "curve",
+          "dex_name": "Curve",
+          "chain": "ethereum",
+          "volume_usd_24h": 15883391.558251368,
+          "created_at": "2025-01-25T17:20:47Z",
+          "created_at_block_number": 21702976,
+          "transactions_24h": 289,
+          "price_usd": 0.9995787501356217,
+          "price_change_percentage_5m": null,
+          "price_change_percentage_1h": 0.02422482089565938,
+          "price_change_percentage_6h": 0.009802157529374174,
+          "price_change_percentage_24h": 0.007018797950998323,
+          "fee": null,
+          "volume_usd_7d": 31781851.73428885,
+          "volume_usd_30d": 136889876.39037386,
+          "liquidity_usd": 7407910.088430515,
+          "tokens": [
+            {"id": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", "chain": "ethereum", "has_image": true}
+          ]
+        }
+      ],
+      "has_next_page": true,
+      "next_cursor": "eyJjaGFpbiI6ImV0aGVyZXVtIn0",
+      "query": {"network": "ethereum", "limit": 2, "dex_name": "curve", "order_by": "volume_usd_24h"}
+    }"#;
+
+    #[test]
+    fn dex_pools_payload_decodes_from_the_search_envelope() {
+        let resp: PoolSearchResponse =
+            serde_json::from_str(LIVE_DEX_POOLS_SAMPLE).expect("live sample must decode");
+
+        // The envelope is results/has_next_page/next_cursor, not pools/page_info.
+        assert_eq!(resp.results.len(), 1);
+        assert_eq!(resp.has_next_page, Some(true));
+        assert_eq!(
+            resp.next_cursor.as_deref(),
+            Some("eyJjaGFpbiI6ImV0aGVyZXVtIn0")
+        );
+
+        // The 24h volume field is volume_usd_24h. A bare volume_usd would decode
+        // as None here, which is exactly the silent breakage this test guards.
+        let pool = &resp.results[0];
+        assert_eq!(pool.volume_usd_24h, Some(15883391.558251368));
+        assert_eq!(pool.dex_id.as_deref(), Some("curve"));
+        assert_eq!(
+            pool.id.as_deref(),
+            Some("0x4f493b7de8aac7d55f71853688b1f7c8f0243c85")
+        );
+        assert_eq!(pool.transactions_24h, Some(289));
+    }
+
+    #[test]
+    fn dex_pools_default_sort_maps_to_the_canonical_search_field() {
+        // The dex-pools --order-by default is still the legacy "volume_usd";
+        // pools/search rejects it, so it has to be mapped before it goes out.
+        assert_eq!(
+            crate::commands::search_mapping::map_pool_sort_field("volume_usd"),
+            "volume_usd_24h"
+        );
+    }
 }
