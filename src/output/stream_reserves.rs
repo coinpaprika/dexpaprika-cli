@@ -10,7 +10,7 @@ pub fn print_reserve_event(event: &ReserveEvent, output: OutputFormat) {
                 .pool_id
                 .as_deref()
                 .map(crate::output::truncate_address)
-                .unwrap_or_else(|| "—".into());
+                .unwrap_or_else(|| "-".into());
             let symbols: Vec<String> = event
                 .tokens
                 .iter()
@@ -27,7 +27,7 @@ pub fn print_reserve_event(event: &ReserveEvent, output: OutputFormat) {
             let time = ts
                 .and_then(|t| chrono::DateTime::from_timestamp(t, 0))
                 .map(|dt| dt.format("%H:%M:%S").to_string())
-                .unwrap_or_else(|| "—".into());
+                .unwrap_or_else(|| "-".into());
             let rid = event
                 .request_id
                 .map(|r| format!("  req {r}"))

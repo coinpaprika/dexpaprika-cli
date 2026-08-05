@@ -3,7 +3,7 @@ use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
 
 pub async fn run_shell() {
-    println!("dexpaprika-cli interactive shell — type commands without 'dexpaprika-cli' prefix");
+    println!("dexpaprika-cli interactive shell: type commands without the 'dexpaprika-cli' prefix");
     println!("Type 'exit' or 'quit' to leave. Ctrl+D also exits.\n");
 
     let mut rl = match DefaultEditor::new() {
@@ -43,7 +43,7 @@ pub async fn run_shell() {
                 }
             }
             Err(ReadlineError::Interrupted) => {
-                println!("(Ctrl+C — type 'exit' to quit)");
+                println!("(Ctrl+C received. Type 'exit' to quit.)");
             }
             Err(ReadlineError::Eof) => {
                 break;

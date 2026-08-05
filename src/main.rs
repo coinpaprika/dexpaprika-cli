@@ -11,11 +11,11 @@ use std::process::ExitCode;
 #[command(
     name = "dexpaprika-cli",
     version,
-    about = "dexpaprika-cli — DEX data from your terminal",
-    long_about = "dexpaprika-cli — DEX data from your terminal\n\n\
-                   Pools · Tokens · On-chain trades · 36+ chains · Real-time streaming\n\n\
+    about = "dexpaprika-cli: DEX data from your terminal",
+    long_about = "dexpaprika-cli: DEX data from your terminal\n\n\
+                   Pools · Tokens · On-chain trades · 36 chains · Streaming\n\n\
                    REST API: no API key needed to start\n\
-                   Streaming: metered like REST, one update = one request\n\
+                   Streaming: metered like REST, one update = one credit\n\
                    Plans: https://dexpaprika.com/pricing\n\n\
                    Quick start:  dexpaprika-cli onboard\n\
                    API docs:     https://api.dexpaprika.com\n\
@@ -365,7 +365,7 @@ enum Commands {
         limit: Option<usize>,
     },
 
-    /// Stream real-time pool reserves via SSE (block-level deltas with USD prices)
+    /// Stream pool reserve changes via SSE, emitted when a swap moves the reserves (USD-denominated deltas)
     #[command(
         name = "stream-reserves",
         after_help = "EXAMPLES:\n  \

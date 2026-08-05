@@ -1,4 +1,4 @@
-//! `stream-reserves` subcommand: subscribe to block-level reserve updates over
+//! `stream-reserves` subcommand: subscribe to swap-driven reserve updates over
 //! Server-Sent Events.
 //!
 //! Two methods, each with its own event shape:

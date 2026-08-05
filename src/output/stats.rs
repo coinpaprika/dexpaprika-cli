@@ -9,7 +9,7 @@ pub fn print_stats(stats: &DexStats) {
         stats
             .chains
             .map(|v| v.to_string())
-            .unwrap_or_else(|| "—".into())
+            .unwrap_or_else(|| "-".into())
     );
     detail_field!(
         rows,
@@ -17,7 +17,7 @@ pub fn print_stats(stats: &DexStats) {
         stats
             .factories
             .map(|v| v.to_string())
-            .unwrap_or_else(|| "—".into())
+            .unwrap_or_else(|| "-".into())
     );
     detail_field!(
         rows,
@@ -25,7 +25,7 @@ pub fn print_stats(stats: &DexStats) {
         stats
             .pools
             .map(|v| v.to_string())
-            .unwrap_or_else(|| "—".into())
+            .unwrap_or_else(|| "-".into())
     );
     detail_field!(
         rows,
@@ -33,7 +33,7 @@ pub fn print_stats(stats: &DexStats) {
         stats
             .tokens
             .map(|v| v.to_string())
-            .unwrap_or_else(|| "—".into())
+            .unwrap_or_else(|| "-".into())
     );
     print_detail_table(rows);
     print_dexpaprika_footer();
