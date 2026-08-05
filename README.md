@@ -50,8 +50,10 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 ## DEX pools
 
 `dex-pools` lists the pools of one DEX. The DEX id is the positional argument, exactly as
-before, and you can get the valid ids from `dexpaprika-cli dexes <network>`. The display name
-("Uniswap V3") works too.
+before, and you can get the valid ids from `dexpaprika-cli dexes <network>`. Pass the id
+column, which is matched case-insensitively. Passing a display name like "Uniswap V3"
+returns an empty list rather than an error, so an empty result usually means a name went in
+where an id belonged.
 
 ```bash
 # First page

@@ -150,7 +150,8 @@ enum Commands {
         /// Network ID
         network: String,
         /// DEX identifier from `dexpaprika-cli dexes <network>` (e.g., uniswap_v3, curve).
-        /// The display name ("Uniswap V3") also works.
+        /// This is the id column, case-insensitive. A display name like "Uniswap V3"
+        /// returns no pools instead of an error.
         dex: String,
         /// Maximum number of results (max 100)
         #[arg(long, default_value = "10")]

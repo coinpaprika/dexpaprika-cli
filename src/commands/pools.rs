@@ -285,10 +285,12 @@ pub async fn execute_pool_detail(
 ///
 /// `/networks/{network}/dexes/{dex}/pools` was removed and returns HTTP 410, so
 /// the DEX moved out of the path and into the `dex_name` query parameter on
-/// `/networks/{network}/pools/search`. The parameter resolves both forms, the
-/// dex id ("uniswap_v3") and the display name ("Uniswap V3"); the CLI passes
-/// whatever the user typed straight through. Search is cursor-paginated, so the
-/// old `page` number is gone and `cursor` takes its place.
+/// `/networks/{network}/pools/search`. Despite its name, the parameter matches the
+/// dex id ("uniswap_v3") case-insensitively and nothing else: a display name like
+/// "Uniswap V3" comes back as HTTP 200 with an empty `results` array rather than an
+/// error. The CLI passes whatever the user typed straight through, so an empty table
+/// usually means a name went in where an id belonged. Search is cursor-paginated, so
+/// the old `page` number is gone and `cursor` takes its place.
 pub async fn execute_dex_pools(
     client: &ApiClient,
     network: &str,
