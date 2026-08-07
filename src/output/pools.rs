@@ -5,8 +5,8 @@ use crate::commands::pools::{
     PoolDetail, PoolListItem, PoolOhlcv, PoolSearchItem, PoolTransaction,
 };
 use crate::output::{
-    detail_field, format_percent, format_price, format_usd, print_detail_table,
-    print_dexpaprika_footer, truncate_address,
+    format_percent, format_price, format_usd, print_detail_table, print_dexpaprika_footer,
+    truncate_address,
 };
 
 fn pool_pair(tokens: &Option<Vec<crate::commands::pools::PoolToken>>) -> String {
