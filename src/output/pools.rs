@@ -74,10 +74,19 @@ struct FilterRow {
     liquidity: String,
     #[tabled(rename = "Txns (24h)")]
     txns: String,
+    #[tabled(rename = "24h Change")]
+    change: String,
     #[tabled(rename = "Created")]
     created: String,
 }
 
+/// Render filtered pools. The 24h change column is here so that filtering on a
+/// percentage puts a percentage in the output to check the result against.
+///
+/// The table does not cover every bound the command takes. `--volume-7d-min`
+/// and `--volume-7d-max` have no column, and neither do the 6h, 1h and 5m
+/// windows; all three sets of values come back in `--output json`. Seven columns
+/// is already about as wide as this table renders comfortably.
 pub fn print_pool_filter_table(results: &[PoolSearchItem]) {
     let rows: Vec<FilterRow> = results
         .iter()
@@ -99,6 +108,10 @@ pub fn print_pool_filter_table(results: &[PoolSearchItem]) {
             txns: r
                 .transactions_24h
                 .map(|t| t.to_string())
+                .unwrap_or_else(|| "-".into()),
+            change: r
+                .price_change_percentage_24h
+                .map(format_percent)
                 .unwrap_or_else(|| "-".into()),
             created: r
                 .created_at
