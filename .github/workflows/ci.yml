@@ -1,0 +1,50 @@
+name: CI
+
+# Until now the only workflow here was release.yml, triggered on `v*` tags. So
+# nothing ran on a pull request and nothing ran on a push to main: code reached
+# main unchecked and the first thing to look at it was a release build. The
+# commit that added the price-change filter flags landed on main with a
+# rustfmt diff in it, which this would have caught in about forty seconds.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Format, lint, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Formatting
+        run: cargo fmt --all --check
+
+      # Warnings are errors here on purpose. A warning nobody fails on is a
+      # warning nobody reads.
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build
+        run: cargo build --locked
+
+      # The suite is hermetic: 42 tests in about ten milliseconds, no network.
+      # That is deliberate and worth keeping. Anything that needs the live API
+      # belongs in the scheduled contract check, not in the pull request gate,
+      # so a rate limit on someone else's traffic can never turn this red.
+      - name: Test
+        run: cargo test --locked

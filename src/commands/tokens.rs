@@ -268,10 +268,7 @@ pub async fn execute_prices(
 /// 24h is the only window tokens carry. The 6h, 1h and 5m bounds that
 /// `pool-filter` takes are deliberately absent: token rows have no such fields,
 /// and ordering tokens by any of the three is a `400`.
-fn token_price_change_params(
-    min: Option<f64>,
-    max: Option<f64>,
-) -> Vec<(&'static str, String)> {
+fn token_price_change_params(min: Option<f64>, max: Option<f64>) -> Vec<(&'static str, String)> {
     let mut params = Vec::new();
     if let Some(v) = min {
         params.push(("price_change_percentage_24h_min", v.to_string()));
@@ -326,7 +323,10 @@ pub async fn execute_filter_tokens(
     if let Some(v) = fdv_max {
         params.push(("fdv_max", v.to_string()));
     }
-    params.extend(token_price_change_params(price_change_24h_min, price_change_24h_max));
+    params.extend(token_price_change_params(
+        price_change_24h_min,
+        price_change_24h_max,
+    ));
     if let Some(v) = txns_24h_min {
         params.push(("txns_24h_min", v.to_string()));
     }
@@ -360,7 +360,6 @@ pub async fn execute_filter_tokens(
     }
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {
