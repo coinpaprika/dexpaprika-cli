@@ -4,6 +4,7 @@ mod output;
 mod shell;
 
 use clap::{Parser, Subcommand};
+use commands::pools::PriceChangeBounds;
 use output::OutputFormat;
 use std::process::ExitCode;
 
@@ -59,7 +60,7 @@ enum Commands {
 
     /// List top pools on a network
     #[command(
-        after_help = "EXAMPLES:\n  dexpaprika-cli pools ethereum --limit 5\n  dexpaprika-cli pools solana --order-by volume_usd --sort desc"
+        after_help = "EXAMPLES:\n  dexpaprika-cli pools ethereum --limit 5\n  dexpaprika-cli pools solana --order-by volume_usd --sort desc\n  dexpaprika-cli pools ethereum --order-by price_change_percentage_5m --sort desc"
     )]
     Pools {
         /// Network ID (e.g., ethereum, solana)
@@ -70,7 +71,8 @@ enum Commands {
         /// Page number (1-indexed)
         #[arg(long, default_value = "1")]
         page: usize,
-        /// Order by field
+        /// Order by field: volume_usd_24h, volume_usd_7d, volume_usd_30d, liquidity_usd,
+        /// txns_24h, created_at, price_usd, price_change_percentage_{24h,6h,1h,5m}
         #[arg(long, default_value = "volume_usd")]
         order_by: String,
         /// Sort order
@@ -78,10 +80,10 @@ enum Commands {
         sort: String,
     },
 
-    /// Filter pools by volume, liquidity, transactions, and creation date
+    /// Filter pools by volume, liquidity, transactions, price change, and creation date
     #[command(
         name = "pool-filter",
-        after_help = "EXAMPLES:\n  dexpaprika-cli pool-filter ethereum --volume-24h-min 100000\n  dexpaprika-cli pool-filter solana --liquidity-usd-min 50000 --sort-by liquidity"
+        after_help = "EXAMPLES:\n  dexpaprika-cli pool-filter ethereum --volume-24h-min 100000\n  dexpaprika-cli pool-filter solana --liquidity-usd-min 50000 --sort-by liquidity\n  dexpaprika-cli pool-filter ethereum --price-change-1h-min 50 --sort-by price_change_percentage_1h\n  dexpaprika-cli pool-filter ethereum --price-change-24h-max -20\n\nPRICE CHANGE BOUNDS:\n  Percentages, and negative values are the point: --price-change-24h-max -20 means\n  down 20% or more over 24h. The 6h, 1h and 5m windows exist for pools only."
     )]
     PoolFilter {
         /// Network ID (e.g., ethereum, solana)
@@ -107,13 +109,39 @@ enum Commands {
         /// Minimum transactions in 24h
         #[arg(long)]
         txns_24h_min: Option<u64>,
+        /// Minimum 24h price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true)]
+        price_change_24h_min: Option<f64>,
+        /// Maximum 24h price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true)]
+        price_change_24h_max: Option<f64>,
+        /// Minimum 6h price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true)]
+        price_change_6h_min: Option<f64>,
+        /// Maximum 6h price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true)]
+        price_change_6h_max: Option<f64>,
+        /// Minimum 1h price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true)]
+        price_change_1h_min: Option<f64>,
+        /// Maximum 1h price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true)]
+        price_change_1h_max: Option<f64>,
+        /// Minimum 5m price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true)]
+        price_change_5m_min: Option<f64>,
+        /// Maximum 5m price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true)]
+        price_change_5m_max: Option<f64>,
         /// Only pools created after this UNIX timestamp
         #[arg(long)]
         created_after: Option<u64>,
         /// Only pools created before this UNIX timestamp
         #[arg(long)]
         created_before: Option<u64>,
-        /// Sort by field: volume_24h, volume_7d, volume_30d, liquidity, txns_24h, created_at
+        /// Sort by field: volume_24h, volume_7d, volume_30d, liquidity, txns_24h, created_at,
+        /// price_usd, price_change_percentage_24h, price_change_percentage_6h,
+        /// price_change_percentage_1h, price_change_percentage_5m
         #[arg(long, default_value = "volume_24h")]
         sort_by: String,
         /// Sort direction: asc or desc
@@ -461,6 +489,14 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
             liquidity_usd_min,
             liquidity_usd_max,
             txns_24h_min,
+            price_change_24h_min,
+            price_change_24h_max,
+            price_change_6h_min,
+            price_change_6h_max,
+            price_change_1h_min,
+            price_change_1h_max,
+            price_change_5m_min,
+            price_change_5m_max,
             created_after,
             created_before,
             sort_by,
@@ -478,6 +514,16 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
                 liquidity_usd_min,
                 liquidity_usd_max,
                 txns_24h_min,
+                PriceChangeBounds {
+                    price_change_24h_min,
+                    price_change_24h_max,
+                    price_change_6h_min,
+                    price_change_6h_max,
+                    price_change_1h_min,
+                    price_change_1h_max,
+                    price_change_5m_min,
+                    price_change_5m_max,
+                },
                 created_after,
                 created_before,
                 &sort_by,
@@ -701,4 +747,115 @@ async fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Parse a pool-filter command line and hand back its price-change bounds.
+    fn parse_bounds(args: &[&str]) -> PriceChangeBounds {
+        let cli = Cli::try_parse_from(args).expect("pool-filter args should parse");
+        match cli.command {
+            Commands::PoolFilter {
+                price_change_24h_min,
+                price_change_24h_max,
+                price_change_6h_min,
+                price_change_6h_max,
+                price_change_1h_min,
+                price_change_1h_max,
+                price_change_5m_min,
+                price_change_5m_max,
+                ..
+            } => PriceChangeBounds {
+                price_change_24h_min,
+                price_change_24h_max,
+                price_change_6h_min,
+                price_change_6h_max,
+                price_change_1h_min,
+                price_change_1h_max,
+                price_change_5m_min,
+                price_change_5m_max,
+            },
+            _ => panic!("expected the pool-filter subcommand"),
+        }
+    }
+
+    #[test]
+    fn pool_filter_accepts_negative_price_change_bounds() {
+        // "down at least 20 percent" is a max of -20. Without
+        // allow_negative_numbers clap reads "-20" as an unknown flag and the
+        // command fails to parse at all.
+        let bounds = parse_bounds(&[
+            "dexpaprika-cli",
+            "pool-filter",
+            "ethereum",
+            "--price-change-24h-max",
+            "-20",
+            "--price-change-5m-min",
+            "-1.5",
+        ]);
+        assert_eq!(bounds.price_change_24h_max, Some(-20.0));
+        assert_eq!(bounds.price_change_5m_min, Some(-1.5));
+    }
+
+    #[test]
+    fn pool_filter_price_change_flags_land_in_their_own_field() {
+        // Eight bounds of the same type sit next to each other, so give each a
+        // distinct value: a transposed pair shows up here rather than as a
+        // quietly wrong query.
+        let bounds = parse_bounds(&[
+            "dexpaprika-cli",
+            "pool-filter",
+            "ethereum",
+            "--price-change-24h-min",
+            "1",
+            "--price-change-24h-max",
+            "2",
+            "--price-change-6h-min",
+            "3",
+            "--price-change-6h-max",
+            "4",
+            "--price-change-1h-min",
+            "5",
+            "--price-change-1h-max",
+            "6",
+            "--price-change-5m-min",
+            "7",
+            "--price-change-5m-max",
+            "8",
+        ]);
+        assert_eq!(bounds.price_change_24h_min, Some(1.0));
+        assert_eq!(bounds.price_change_24h_max, Some(2.0));
+        assert_eq!(bounds.price_change_6h_min, Some(3.0));
+        assert_eq!(bounds.price_change_6h_max, Some(4.0));
+        assert_eq!(bounds.price_change_1h_min, Some(5.0));
+        assert_eq!(bounds.price_change_1h_max, Some(6.0));
+        assert_eq!(bounds.price_change_5m_min, Some(7.0));
+        assert_eq!(bounds.price_change_5m_max, Some(8.0));
+    }
+
+    #[test]
+    fn pool_filter_price_change_bounds_default_to_none() {
+        let bounds = parse_bounds(&["dexpaprika-cli", "pool-filter", "ethereum"]);
+        assert_eq!(bounds.price_change_24h_min, None);
+        assert_eq!(bounds.price_change_5m_max, None);
+    }
+
+    #[test]
+    fn filter_tokens_has_no_price_change_window_flags() {
+        // tokens/search 400s on these windows and ignores the matching filters,
+        // so the token command must not grow them.
+        let parsed = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "filter-tokens",
+            "ethereum",
+            "--price-change-1h-min",
+            "50",
+        ]);
+        assert!(
+            parsed.is_err(),
+            "filter-tokens should reject --price-change-1h-min"
+        );
+    }
 }

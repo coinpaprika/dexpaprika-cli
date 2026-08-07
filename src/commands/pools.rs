@@ -151,8 +151,26 @@ pub struct PoolSearchItem {
     pub price_usd: Option<f64>,
     pub price_change_percentage_5m: Option<f64>,
     pub price_change_percentage_1h: Option<f64>,
+    pub price_change_percentage_6h: Option<f64>,
     pub price_change_percentage_24h: Option<f64>,
     pub tokens: Option<Vec<PoolToken>>,
+}
+
+/// The four price-change windows that `/networks/{network}/pools/search` accepts
+/// as bounds, carried together so the CLI flags cannot get transposed on the way
+/// through. Values are percentages and negatives are ordinary input: a max of
+/// -20 means "down 20% or more". These windows are pools-only; tokens/search
+/// ignores them and token rows have no such field.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct PriceChangeBounds {
+    pub price_change_24h_min: Option<f64>,
+    pub price_change_24h_max: Option<f64>,
+    pub price_change_6h_min: Option<f64>,
+    pub price_change_6h_max: Option<f64>,
+    pub price_change_1h_min: Option<f64>,
+    pub price_change_1h_max: Option<f64>,
+    pub price_change_5m_min: Option<f64>,
+    pub price_change_5m_max: Option<f64>,
 }
 
 pub async fn execute_pool_filter(
@@ -165,6 +183,7 @@ pub async fn execute_pool_filter(
     liquidity_usd_min: Option<f64>,
     liquidity_usd_max: Option<f64>,
     txns_24h_min: Option<u64>,
+    price_change: PriceChangeBounds,
     created_after: Option<u64>,
     created_before: Option<u64>,
     sort_by: &str,
@@ -203,6 +222,48 @@ pub async fn execute_pool_filter(
     }
     if let Some(v) = txns_24h_min {
         params.push(("txns_24h_min", v.to_string()));
+    }
+    // Price-change bounds, name paired with value so the eight cannot drift
+    // apart. f64's Display gives the shortest round-trip form, so -20 goes on the
+    // wire as "-20". An unknown filter name here would be silently ignored by the
+    // API and come back as a full unfiltered 200, so these names are canonical.
+    for (name, value) in [
+        (
+            "price_change_percentage_24h_min",
+            price_change.price_change_24h_min,
+        ),
+        (
+            "price_change_percentage_24h_max",
+            price_change.price_change_24h_max,
+        ),
+        (
+            "price_change_percentage_6h_min",
+            price_change.price_change_6h_min,
+        ),
+        (
+            "price_change_percentage_6h_max",
+            price_change.price_change_6h_max,
+        ),
+        (
+            "price_change_percentage_1h_min",
+            price_change.price_change_1h_min,
+        ),
+        (
+            "price_change_percentage_1h_max",
+            price_change.price_change_1h_max,
+        ),
+        (
+            "price_change_percentage_5m_min",
+            price_change.price_change_5m_min,
+        ),
+        (
+            "price_change_percentage_5m_max",
+            price_change.price_change_5m_max,
+        ),
+    ] {
+        if let Some(v) = value {
+            params.push((name, v.to_string()));
+        }
     }
     if let Some(v) = created_after {
         params.push(("created_after", v.to_string()));

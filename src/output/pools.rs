@@ -74,10 +74,16 @@ struct FilterRow {
     liquidity: String,
     #[tabled(rename = "Txns (24h)")]
     txns: String,
+    #[tabled(rename = "24h Change")]
+    change: String,
     #[tabled(rename = "Created")]
     created: String,
 }
 
+/// Render filtered pools. Every other bound this command takes has a column
+/// here, so the price-change bounds get one too: filtering on a percentage and
+/// seeing no percentage back gives the caller nothing to check. The finer 6h, 1h
+/// and 5m windows are in `--output json`.
 pub fn print_pool_filter_table(results: &[PoolSearchItem]) {
     let rows: Vec<FilterRow> = results
         .iter()
@@ -99,6 +105,10 @@ pub fn print_pool_filter_table(results: &[PoolSearchItem]) {
             txns: r
                 .transactions_24h
                 .map(|t| t.to_string())
+                .unwrap_or_else(|| "-".into()),
+            change: r
+                .price_change_percentage_24h
+                .map(format_percent)
                 .unwrap_or_else(|| "-".into()),
             created: r
                 .created_at
