@@ -3,8 +3,8 @@ use tabled::{Table, Tabled};
 
 use crate::commands::tokens::{TokenDetail, TokenPrice, TokenSearchItem};
 use crate::output::{
-    detail_field, format_percent, format_price, format_usd, print_detail_table,
-    print_dexpaprika_footer, truncate_address,
+    format_percent, format_price, format_usd, print_detail_table, print_dexpaprika_footer,
+    truncate_address,
 };
 
 pub fn print_token_detail(token: &TokenDetail) {
