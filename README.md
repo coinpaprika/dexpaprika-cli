@@ -32,6 +32,7 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 | `networks` | List all chains | `dexpaprika-cli networks` |
 | `dexes` | DEXes on a network | `dexpaprika-cli dexes ethereum` |
 | `pools` | Top pools on a network | `dexpaprika-cli pools ethereum --limit 5` |
+| `pool-filter` | Filter pools by volume, liquidity, txns, price change | `dexpaprika-cli pool-filter ethereum --price-change-24h-max -20` |
 | `pool` | Pool details | `dexpaprika-cli pool ethereum 0x88e6...` |
 | `dex-pools` | Pools on a specific DEX | `dexpaprika-cli dex-pools ethereum uniswap_v3` |
 | `transactions` | Recent pool transactions | `dexpaprika-cli transactions ethereum 0x88e6...` |
@@ -46,6 +47,25 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 | `attribution` | Attribution snippets | `dexpaprika-cli attribution` |
 | `onboard` | Welcome & quick start | `dexpaprika-cli onboard` |
 | `shell` | Interactive REPL | `dexpaprika-cli shell` |
+
+## Price change windows
+
+`pool-filter` bounds four price-change windows, and both `pools` and `pool-filter` can sort by any of them. Values are percentages, so a max of -20 reads as "down 20% or more":
+
+```bash
+# Pools down 20% or more over 24h
+dexpaprika-cli pool-filter ethereum --price-change-24h-max -20 --limit 5
+
+# Pools up 50% or more in the last hour, sorted by that same hour
+dexpaprika-cli pool-filter ethereum --price-change-1h-min 50 --sort-by price_change_percentage_1h
+
+# The short windows on the sort side
+dexpaprika-cli --output json pools ethereum --order-by price_change_percentage_5m --sort desc
+```
+
+The eight bounds are `--price-change-{24h,6h,1h,5m}-{min,max}`. Tables carry the 24h change, so ask for `--output json` when you want the 6h, 1h and 5m numbers back.
+
+The 6h, 1h and 5m windows work on pools only. The token endpoint rejects those three as sort fields and quietly ignores them as bounds, so `top-tokens` sorts by the 24h window at most and `filter-tokens` carries no price-change bounds.
 
 ## Streaming
 

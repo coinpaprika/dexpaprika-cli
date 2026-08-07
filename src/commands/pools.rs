@@ -159,8 +159,15 @@ pub struct PoolSearchItem {
 /// The four price-change windows that `/networks/{network}/pools/search` accepts
 /// as bounds, carried together so the CLI flags cannot get transposed on the way
 /// through. Values are percentages and negatives are ordinary input: a max of
-/// -20 means "down 20% or more". These windows are pools-only; tokens/search
-/// ignores them and token rows have no such field.
+/// -20 means "down 20% or more".
+///
+/// Only the three short windows are pools-only. tokens/search takes the 24h
+/// bounds as well, and silently ignores the 6h, 1h and 5m ones. Checked on
+/// 2026-08-07 against an unfiltered baseline, because an unknown bound comes
+/// back as HTTP 200 with a full result set: on ethereum tokens/search,
+/// `price_change_percentage_24h_min=20` returned 36.6, 33.2, 1251.0 where the
+/// baseline had -0.07, 0.24, -0.01, while `price_change_percentage_6h_min=20`
+/// returned the baseline unchanged.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PriceChangeBounds {
     pub price_change_24h_min: Option<f64>,
@@ -171,6 +178,39 @@ pub struct PriceChangeBounds {
     pub price_change_1h_max: Option<f64>,
     pub price_change_5m_min: Option<f64>,
     pub price_change_5m_max: Option<f64>,
+}
+
+/// Pair each set bound with the query parameter name the API expects.
+///
+/// This lives outside `execute_pool_filter` so the eight names can be pinned by
+/// a test. Nothing at runtime can catch a typo in them: pools/search answers 200
+/// and hands back a full unfiltered set for a parameter it does not recognise,
+/// so `price_change_percentage_1hr_min` looks exactly like a working query. The
+/// live wire is the authority for what these names are, the tests below are the
+/// lock that stops them drifting afterwards.
+///
+/// f64's Display gives the shortest round-trip form, so a bound of -20.0 goes
+/// out as "-20".
+pub fn price_change_params(bounds: &PriceChangeBounds) -> Vec<(&'static str, String)> {
+    [
+        (
+            "price_change_percentage_24h_min",
+            bounds.price_change_24h_min,
+        ),
+        (
+            "price_change_percentage_24h_max",
+            bounds.price_change_24h_max,
+        ),
+        ("price_change_percentage_6h_min", bounds.price_change_6h_min),
+        ("price_change_percentage_6h_max", bounds.price_change_6h_max),
+        ("price_change_percentage_1h_min", bounds.price_change_1h_min),
+        ("price_change_percentage_1h_max", bounds.price_change_1h_max),
+        ("price_change_percentage_5m_min", bounds.price_change_5m_min),
+        ("price_change_percentage_5m_max", bounds.price_change_5m_max),
+    ]
+    .into_iter()
+    .filter_map(|(name, value)| value.map(|v| (name, v.to_string())))
+    .collect()
 }
 
 pub async fn execute_pool_filter(
@@ -223,48 +263,7 @@ pub async fn execute_pool_filter(
     if let Some(v) = txns_24h_min {
         params.push(("txns_24h_min", v.to_string()));
     }
-    // Price-change bounds, name paired with value so the eight cannot drift
-    // apart. f64's Display gives the shortest round-trip form, so -20 goes on the
-    // wire as "-20". An unknown filter name here would be silently ignored by the
-    // API and come back as a full unfiltered 200, so these names are canonical.
-    for (name, value) in [
-        (
-            "price_change_percentage_24h_min",
-            price_change.price_change_24h_min,
-        ),
-        (
-            "price_change_percentage_24h_max",
-            price_change.price_change_24h_max,
-        ),
-        (
-            "price_change_percentage_6h_min",
-            price_change.price_change_6h_min,
-        ),
-        (
-            "price_change_percentage_6h_max",
-            price_change.price_change_6h_max,
-        ),
-        (
-            "price_change_percentage_1h_min",
-            price_change.price_change_1h_min,
-        ),
-        (
-            "price_change_percentage_1h_max",
-            price_change.price_change_1h_max,
-        ),
-        (
-            "price_change_percentage_5m_min",
-            price_change.price_change_5m_min,
-        ),
-        (
-            "price_change_percentage_5m_max",
-            price_change.price_change_5m_max,
-        ),
-    ] {
-        if let Some(v) = value {
-            params.push((name, v.to_string()));
-        }
-    }
+    params.extend(price_change_params(&price_change));
     if let Some(v) = created_after {
         params.push(("created_after", v.to_string()));
     }
@@ -506,4 +505,93 @@ pub async fn execute_ohlcv(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every bound set, each to a different value, so a transposed pair shows up
+    /// as a wrong value next to the right name.
+    fn all_bounds() -> PriceChangeBounds {
+        PriceChangeBounds {
+            price_change_24h_min: Some(1.0),
+            price_change_24h_max: Some(2.0),
+            price_change_6h_min: Some(3.0),
+            price_change_6h_max: Some(4.0),
+            price_change_1h_min: Some(5.0),
+            price_change_1h_max: Some(6.0),
+            price_change_5m_min: Some(7.0),
+            price_change_5m_max: Some(8.0),
+        }
+    }
+
+    #[test]
+    fn price_change_params_carry_the_names_the_api_expects() {
+        let params = price_change_params(&all_bounds());
+        let pairs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        assert_eq!(
+            pairs,
+            vec![
+                ("price_change_percentage_24h_min", "1"),
+                ("price_change_percentage_24h_max", "2"),
+                ("price_change_percentage_6h_min", "3"),
+                ("price_change_percentage_6h_max", "4"),
+                ("price_change_percentage_1h_min", "5"),
+                ("price_change_percentage_1h_max", "6"),
+                ("price_change_percentage_5m_min", "7"),
+                ("price_change_percentage_5m_max", "8"),
+            ]
+        );
+    }
+
+    /// The same eight names one layer further out, read off the URL reqwest
+    /// would actually send. Verified against api.dexpaprika.com on 2026-08-07:
+    /// each of these bounds changes the result set, and a misspelling of any of
+    /// them returns the unfiltered baseline at HTTP 200.
+    #[test]
+    fn price_change_bounds_reach_the_query_string() {
+        let params = price_change_params(&all_bounds());
+        let refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        let request = reqwest::Client::new()
+            .get("https://api.dexpaprika.com/networks/ethereum/pools/search")
+            .query(&refs)
+            .build()
+            .expect("the request should build");
+
+        assert_eq!(
+            request.url().query().expect("a query string"),
+            "price_change_percentage_24h_min=1&price_change_percentage_24h_max=2\
+             &price_change_percentage_6h_min=3&price_change_percentage_6h_max=4\
+             &price_change_percentage_1h_min=5&price_change_percentage_1h_max=6\
+             &price_change_percentage_5m_min=7&price_change_percentage_5m_max=8"
+        );
+    }
+
+    #[test]
+    fn negative_bounds_survive_url_encoding() {
+        // "down 20% or more over 24h" has to leave as -20, not as %2D20 or 20.
+        let bounds = PriceChangeBounds {
+            price_change_24h_max: Some(-20.0),
+            price_change_5m_min: Some(-1.5),
+            ..PriceChangeBounds::default()
+        };
+        let params = price_change_params(&bounds);
+        let refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        let request = reqwest::Client::new()
+            .get("https://api.dexpaprika.com/networks/ethereum/pools/search")
+            .query(&refs)
+            .build()
+            .expect("the request should build");
+
+        assert_eq!(
+            request.url().query().expect("a query string"),
+            "price_change_percentage_24h_max=-20&price_change_percentage_5m_min=-1.5"
+        );
+    }
+
+    #[test]
+    fn unset_bounds_send_nothing() {
+        assert!(price_change_params(&PriceChangeBounds::default()).is_empty());
+    }
 }

@@ -80,10 +80,13 @@ struct FilterRow {
     created: String,
 }
 
-/// Render filtered pools. Every other bound this command takes has a column
-/// here, so the price-change bounds get one too: filtering on a percentage and
-/// seeing no percentage back gives the caller nothing to check. The finer 6h, 1h
-/// and 5m windows are in `--output json`.
+/// Render filtered pools. The 24h change column is here so that filtering on a
+/// percentage puts a percentage in the output to check the result against.
+///
+/// The table does not cover every bound the command takes. `--volume-7d-min`
+/// and `--volume-7d-max` have no column, and neither do the 6h, 1h and 5m
+/// windows; all three sets of values come back in `--output json`. Seven columns
+/// is already about as wide as this table renders comfortably.
 pub fn print_pool_filter_table(results: &[PoolSearchItem]) {
     let rows: Vec<FilterRow> = results
         .iter()
