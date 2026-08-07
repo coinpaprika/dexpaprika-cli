@@ -256,6 +256,32 @@ pub async fn execute_prices(
     Ok(())
 }
 
+/// Wire names for the token price-change bounds.
+///
+/// Pulled out of `execute_filter_tokens` so it can be tested. That matters more
+/// than usual here: `/networks/{network}/tokens/search` ignores query
+/// parameters it does not recognise and still answers `200` with the full
+/// unfiltered page, so a misspelled name produces a plausible result set and no
+/// error anywhere. A unit test on the literal strings is the only cheap place
+/// that catches it.
+///
+/// 24h is the only window tokens carry. The 6h, 1h and 5m bounds that
+/// `pool-filter` takes are deliberately absent: token rows have no such fields,
+/// and ordering tokens by any of the three is a `400`.
+fn token_price_change_params(
+    min: Option<f64>,
+    max: Option<f64>,
+) -> Vec<(&'static str, String)> {
+    let mut params = Vec::new();
+    if let Some(v) = min {
+        params.push(("price_change_percentage_24h_min", v.to_string()));
+    }
+    if let Some(v) = max {
+        params.push(("price_change_percentage_24h_max", v.to_string()));
+    }
+    params
+}
+
 pub async fn execute_filter_tokens(
     client: &ApiClient,
     network: &str,
@@ -269,6 +295,8 @@ pub async fn execute_filter_tokens(
     fdv_min: Option<f64>,
     fdv_max: Option<f64>,
     txns_24h_min: Option<u64>,
+    price_change_24h_min: Option<f64>,
+    price_change_24h_max: Option<f64>,
     created_after: Option<u64>,
     created_before: Option<u64>,
     output: OutputFormat,
@@ -298,6 +326,7 @@ pub async fn execute_filter_tokens(
     if let Some(v) = fdv_max {
         params.push(("fdv_max", v.to_string()));
     }
+    params.extend(token_price_change_params(price_change_24h_min, price_change_24h_max));
     if let Some(v) = txns_24h_min {
         params.push(("txns_24h_min", v.to_string()));
     }
@@ -330,4 +359,33 @@ pub async fn execute_filter_tokens(
         }
     }
     Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verified against api.dexpaprika.com on 2026-08-07. Baseline 24h changes
+    /// on ethereum were [95.7, -0.04, -0.02, -0.0, 0.61]; with
+    /// --price-change-24h-min 20 the same command returned
+    /// [95.7, 36.36, 923.6, 41.72, 2764.61], and with --price-change-24h-max -20
+    /// it returned [-99.32, -23.58, -90.79, -54.22, -21.12].
+    #[test]
+    fn token_price_change_params_carry_the_names_the_api_expects() {
+        let params = token_price_change_params(Some(20.0), Some(-20.0));
+        let pairs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        assert_eq!(
+            pairs,
+            vec![
+                ("price_change_percentage_24h_min", "20"),
+                ("price_change_percentage_24h_max", "-20"),
+            ]
+        );
+    }
+
+    #[test]
+    fn unset_token_bounds_send_nothing() {
+        assert!(token_price_change_params(None, None).is_empty());
+    }
 }

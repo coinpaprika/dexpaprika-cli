@@ -334,6 +334,12 @@ enum Commands {
         /// Minimum transactions in last 24h
         #[arg(long)]
         txns_24h_min: Option<u64>,
+        /// Minimum 24h price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
+        price_change_24h_min: Option<f64>,
+        /// Maximum 24h price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
+        price_change_24h_max: Option<f64>,
         /// Only tokens created after this UNIX timestamp
         #[arg(long)]
         created_after: Option<u64>,
@@ -662,6 +668,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
             fdv_min,
             fdv_max,
             txns_24h_min,
+            price_change_24h_min,
+            price_change_24h_max,
             created_after,
             created_before,
         } => {
@@ -678,6 +686,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
                 fdv_min,
                 fdv_max,
                 txns_24h_min,
+                price_change_24h_min,
+                price_change_24h_max,
                 created_after,
                 created_before,
                 output,

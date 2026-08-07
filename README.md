@@ -65,7 +65,7 @@ dexpaprika-cli --output json pools ethereum --order-by price_change_percentage_5
 
 The eight bounds are `--price-change-{24h,6h,1h,5m}-{min,max}`. Tables carry the 24h change, so ask for `--output json` when you want the 6h, 1h and 5m numbers back.
 
-The 6h, 1h and 5m windows work on pools only. The token endpoint rejects those three as sort fields and quietly ignores them as bounds, so `top-tokens` sorts by the 24h window at most and `filter-tokens` carries no price-change bounds.
+Only the 6h, 1h and 5m windows are pools-only. The token endpoint rejects those three as sort fields and quietly ignores them as bounds, which is the nastier half: an ignored bound comes back `200` with the unfiltered page. The 24h window works on both sides, so `top-tokens` sorts by it and `filter-tokens` takes `--price-change-24h-min` and `--price-change-24h-max`.
 
 ## Streaming
 
