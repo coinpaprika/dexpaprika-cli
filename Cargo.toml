@@ -1,6 +1,6 @@
 [package]
 name = "dexpaprika-cli"
-version = "0.4.4"
+version = "0.5.0"
 edition = "2021"
 description = "DexPaprika CLI: DEX data from the terminal. Pools, tokens, on-chain trades across 36 chains. Free tier, no API key needed to start."
 license = "MIT"
