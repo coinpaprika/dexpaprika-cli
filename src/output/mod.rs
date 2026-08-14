@@ -139,8 +139,10 @@ macro_rules! detail_field {
     };
 }
 
-pub(crate) use detail_field;
-
+// No `pub(crate) use` re-export: macro_rules! is textually scoped, so every
+// module declared below this point already sees detail_field!. The re-export
+// and the matching `use crate::output::{detail_field}` lines in four submodules
+// were redundant, and clippy on a current toolchain fails the build over them.
 pub mod networks;
 pub mod pools;
 pub mod search;

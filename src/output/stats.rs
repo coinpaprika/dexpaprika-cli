@@ -1,5 +1,5 @@
 use crate::commands::stats::DexStats;
-use crate::output::{detail_field, print_detail_table, print_dexpaprika_footer};
+use crate::output::{print_detail_table, print_dexpaprika_footer};
 
 pub fn print_stats(stats: &DexStats) {
     let mut rows: Vec<[String; 2]> = Vec::new();
