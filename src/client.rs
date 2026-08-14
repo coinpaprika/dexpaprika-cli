@@ -104,9 +104,9 @@ mod tests {
 
     #[test]
     fn deprecation_hint_surfaces_replacement_and_message() {
-        let body = r#"{"code":410,"message":"endpoint removed","replacement":"/networks/:network/pools/search"}"#;
+        let body = r#"{"code":410,"message":"endpoint removed","replacement":"/networks/{network}/pools/search"}"#;
         let hint = deprecation_hint(StatusCode::GONE, body).expect("expected a hint");
-        assert!(hint.contains("/networks/:network/pools/search"));
+        assert!(hint.contains("/networks/{network}/pools/search"));
         assert!(hint.contains("endpoint removed"));
         assert!(hint.contains("410"));
     }

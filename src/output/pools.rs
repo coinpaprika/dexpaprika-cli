@@ -1,9 +1,7 @@
 use tabled::settings::Style;
 use tabled::{Table, Tabled};
 
-use crate::commands::pools::{
-    PoolDetail, PoolListItem, PoolOhlcv, PoolSearchItem, PoolTransaction,
-};
+use crate::commands::pools::{PoolDetail, PoolOhlcv, PoolSearchItem, PoolTransaction};
 use crate::output::{
     format_percent, format_price, format_usd, print_detail_table, print_dexpaprika_footer,
     truncate_address,
@@ -19,47 +17,6 @@ fn pool_pair(tokens: &Option<Vec<crate::commands::pools::PoolToken>>) -> String 
                 .join("/")
         })
         .unwrap_or_else(|| "-".into())
-}
-
-#[derive(Tabled)]
-struct PoolRow {
-    #[tabled(rename = "Pool")]
-    pool: String,
-    #[tabled(rename = "DEX")]
-    dex: String,
-    #[tabled(rename = "Pair")]
-    pair: String,
-    #[tabled(rename = "Price")]
-    price: String,
-    #[tabled(rename = "Volume (24h)")]
-    volume: String,
-    #[tabled(rename = "24h Change")]
-    change: String,
-}
-
-pub fn print_pools_table(pools: &[PoolListItem]) {
-    let rows: Vec<PoolRow> = pools
-        .iter()
-        .map(|p| PoolRow {
-            pool: p
-                .id
-                .as_deref()
-                .map(truncate_address)
-                .unwrap_or_else(|| "-".into()),
-            dex: p.dex_name.clone().unwrap_or_else(|| "-".into()),
-            pair: pool_pair(&p.tokens),
-            price: p.price_usd.map(format_price).unwrap_or_else(|| "-".into()),
-            volume: p.volume_usd.map(format_usd).unwrap_or_else(|| "-".into()),
-            change: p
-                .last_price_change_usd_24h
-                .map(format_percent)
-                .unwrap_or_else(|| "-".into()),
-        })
-        .collect();
-
-    let table = Table::new(rows).with(Style::rounded()).to_string();
-    println!("{table}");
-    print_dexpaprika_footer();
 }
 
 #[derive(Tabled)]

@@ -34,7 +34,7 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 | `pools` | Top pools on a network | `dexpaprika-cli pools ethereum --limit 5` |
 | `pool-filter` | Filter pools by volume, liquidity, txns, price change | `dexpaprika-cli pool-filter ethereum --price-change-24h-max -20` |
 | `pool` | Pool details | `dexpaprika-cli pool ethereum 0x88e6...` |
-| `dex-pools` | Pools on a specific DEX | `dexpaprika-cli dex-pools ethereum uniswap_v3` |
+| `dex-pools` | Pools on a specific DEX | `dexpaprika-cli dex-pools ethereum uniswap_v3 --limit 5` |
 | `transactions` | Recent pool transactions | `dexpaprika-cli transactions ethereum 0x88e6...` |
 | `pool-ohlcv` | Pool OHLCV data | `dexpaprika-cli pool-ohlcv ethereum 0x88e6... --start 2025-01-01` |
 | `token` | Token details | `dexpaprika-cli token ethereum 0xc02a...` |
@@ -47,6 +47,25 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 | `attribution` | Attribution snippets | `dexpaprika-cli attribution` |
 | `onboard` | Welcome & quick start | `dexpaprika-cli onboard` |
 | `shell` | Interactive REPL | `dexpaprika-cli shell` |
+
+## DEX pools
+
+`dex-pools` lists the pools of one DEX. The DEX id is the positional argument, exactly as
+before, and you can get the valid ids from `dexpaprika-cli dexes <network>`. Pass the id
+column, which is matched case-insensitively. Passing a display name like "Uniswap V3"
+returns an empty list rather than an error, so an empty result usually means a name went in
+where an id belonged.
+
+```bash
+# First page
+dexpaprika-cli dex-pools ethereum uniswap_v3 --limit 5
+
+# Next page: pass the next_cursor printed under the table
+dexpaprika-cli dex-pools ethereum uniswap_v3 --limit 5 --cursor eyJjaGFpbiI6ImV0aGVyZXVtIi...
+```
+
+Results are cursor-paginated, so there is no `--page` flag on this command. The table prints
+`next_cursor` when more results are available; feed it back through `--cursor`.
 
 ## Price change windows
 
