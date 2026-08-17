@@ -4,10 +4,22 @@ use reqwest::StatusCode;
 pub struct ApiClient {
     http: reqwest::Client,
     dexpaprika_base: String,
+    /// Optional API key. `None` means keyless, which is the default and works.
+    api_key: Option<String>,
 }
 
 impl ApiClient {
-    pub fn new() -> Self {
+    /// Client that sends an API key when one is configured.
+    ///
+    /// The key is the ENTIRE `Authorization` value. There is no `Bearer` prefix
+    /// and no other scheme word: the API checksums the raw header, so a scheme
+    /// word returns 401. This is the most common reason a working key looks
+    /// broken.
+    ///
+    /// The host is never inferred from the key. Free keys are served from the
+    /// default base and only Pro moves to api-pro.dexpaprika.com; sending a free
+    /// key there returns 403.
+    pub fn with_api_key(api_key: Option<String>) -> Self {
         let ua = format!(
             "dexpaprika-cli/{} ({}/{})",
             env!("CARGO_PKG_VERSION"),
@@ -20,6 +32,20 @@ impl ApiClient {
                 .build()
                 .expect("failed to build HTTP client"),
             dexpaprika_base: "https://api.dexpaprika.com".to_string(),
+            api_key,
+        }
+    }
+
+    /// Attach the API key to a request builder, if one is configured.
+    ///
+    /// Used by the streaming commands, which build their own requests rather
+    /// than going through `dexpaprika_get`. Streaming authenticates the same way
+    /// as REST: verified on the wire, a bad key there returns 401 and no key
+    /// returns 200.
+    pub fn authorize(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        match &self.api_key {
+            Some(key) => req.header("Authorization", key),
+            None => req,
         }
     }
 
@@ -30,6 +56,11 @@ impl ApiClient {
     ) -> Result<T> {
         let url = format!("{}{}", self.dexpaprika_base, path);
         let mut req = self.http.get(&url);
+
+        if let Some(key) = &self.api_key {
+            // The whole value, with no scheme word in front of it.
+            req = req.header("Authorization", key);
+        }
 
         if !params.is_empty() {
             req = req.query(params);
