@@ -1,5 +1,6 @@
 mod client;
 mod commands;
+mod config;
 mod output;
 mod shell;
 
@@ -34,6 +35,26 @@ pub(crate) struct Cli {
     /// JSON output without _meta wrapper (for scripts/piping)
     #[arg(long, global = true, default_value = "false")]
     pub(crate) raw: bool,
+
+    /// Optional API key. Beats DEXPAPRIKA_API_KEY and the stored config.
+    ///
+    /// The CLI works without one; a key raises the monthly credit allowance.
+    #[arg(long, global = true, value_name = "KEY")]
+    pub(crate) api_key: Option<String>,
+}
+
+/// Subcommands of `config`.
+#[derive(clap::Subcommand, Debug)]
+pub(crate) enum ConfigCommands {
+    /// Show which key is in use and what the API makes of it
+    Show,
+    /// Validate a key against the API, then store it
+    SetKey {
+        /// The key, exactly as issued. No "Bearer" prefix.
+        key: String,
+    },
+    /// Forget the stored key
+    Delete,
 }
 
 /// Parse a percentage bound and refuse the values f64 accepts but the API does
@@ -473,6 +494,12 @@ enum Commands {
 
     /// Welcome message and quick start guide
     Onboard,
+
+    /// Manage the optional API key
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
+    },
 }
 
 pub(crate) fn run(
@@ -482,7 +509,10 @@ pub(crate) fn run(
 }
 
 async fn run_inner(cli: Cli) -> anyhow::Result<()> {
-    let client = client::ApiClient::new();
+    // Keyless unless a key is configured: --api-key, then DEXPAPRIKA_API_KEY,
+    // then ~/.dexpaprika/config.json. No key keeps the previous behaviour.
+    let api_key = config::resolve_api_key(cli.api_key.as_deref());
+    let client = client::ApiClient::with_api_key(api_key);
     let output = cli.output;
     let raw = cli.raw;
 
@@ -765,6 +795,11 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
             Ok(())
         }
         Commands::Onboard => commands::onboard::execute(),
+        Commands::Config { command } => match command {
+            ConfigCommands::Show => commands::config_cmd::show(cli.api_key.as_deref()).await,
+            ConfigCommands::SetKey { key } => commands::config_cmd::set_key(&key).await,
+            ConfigCommands::Delete => commands::config_cmd::delete(),
+        },
     }
 }
 

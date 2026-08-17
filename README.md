@@ -24,6 +24,36 @@ Streaming is metered the same way as REST: each delivered update counts as one c
 
 Need higher limits or SLA? Contact support@coinpaprika.com
 
+## Optional API key
+
+**The CLI works without a key and always will.** Nothing above needs one.
+
+A free key raises the monthly credit allowance. It does **not** raise the
+per-minute limit, which is the same on both free tiers, so reach for one when you
+are running out of monthly credits rather than hitting rate limits. Current
+figures: [rate limits](https://docs.dexpaprika.com/knowledge-base/rate-limits).
+
+```bash
+dexpaprika-cli config set-key api_YOUR_KEY   # validates against the API, then stores it
+dexpaprika-cli config show                   # which key is in use and what the API makes of it
+dexpaprika-cli config delete                 # forget it and go back to keyless
+```
+
+Or set `DEXPAPRIKA_API_KEY`, or pass `--api-key` on any command. Precedence is
+flag, then environment, then the stored config, then keyless.
+
+**Paste the key on its own. There is no `Bearer` prefix**, and no other scheme
+word: the API checksums the raw header, so a scheme word returns 401.
+
+`config set-key` checks the key against `/usage` before storing it, and refuses
+to save one the API rejects. That is deliberate: on the data endpoints a key the
+API cannot read is ignored rather than rejected, returning `200` with real data
+while quietly serving you the keyless tier, so a broken key otherwise looks
+exactly like a working one. `/usage` is the only endpoint that reports the truth.
+
+The stored file is `~/.dexpaprika/config.json`, created `0600` in a `0700`
+directory.
+
 ## All commands
 
 | Command | Description | Example |

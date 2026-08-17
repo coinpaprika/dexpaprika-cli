@@ -73,13 +73,14 @@ pub async fn execute(
         stream_multi(client, file, limit, output).await
     } else {
         match (network, token_address) {
-            (Some(net), Some(addr)) => stream_single(net, addr, limit, output).await,
+            (Some(net), Some(addr)) => stream_single(client, net, addr, limit, output).await,
             _ => bail!("Provide either <network> <token_address> or --tokens <file.json>"),
         }
     }
 }
 
 async fn stream_single(
+    client: &ApiClient,
     network: &str,
     address: &str,
     limit: Option<usize>,
@@ -89,7 +90,9 @@ async fn stream_single(
         "https://streaming.dexpaprika.com/sse/prices?method=token_price&chain={network}&address={address}"
     );
 
-    let mut es = EventSource::get(&url);
+    // EventSource::get cannot carry headers, so build the request first and let
+    // the client attach the key when one is configured.
+    let mut es = EventSource::new(client.authorize(client.http_client().get(&url)))?;
     let mut count = 0usize;
 
     loop {
@@ -192,10 +195,13 @@ async fn stream_multi(
     let body = serde_json::to_string(&tokens)?;
 
     let resp = client
-        .http_client()
-        .post("https://streaming.dexpaprika.com/sse/prices")
-        .header("Accept", "text/event-stream")
-        .header("Content-Type", "application/json")
+        .authorize(
+            client
+                .http_client()
+                .post("https://streaming.dexpaprika.com/sse/prices")
+                .header("Accept", "text/event-stream")
+                .header("Content-Type", "application/json"),
+        )
         .body(body)
         .send()
         .await?;
