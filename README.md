@@ -43,7 +43,8 @@ Or set `DEXPAPRIKA_API_KEY`, or pass `--api-key` on any command. Precedence is
 flag, then environment, then the stored config, then keyless.
 
 **Paste the key on its own. There is no `Bearer` prefix**, and no other scheme
-word: the API checksums the raw header, so a scheme word returns 401.
+word: the API compares the raw header against your key, so `ApiKey` or `Token`
+in front of it returns 401.
 
 `config set-key` checks the key against `/usage` before storing it, and refuses
 to save one the API rejects. That is deliberate: on the data endpoints a key the
