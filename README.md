@@ -19,7 +19,7 @@ dexpaprika-cli search uniswap
 
 ## No setup required
 
-No API key, no registration to start. The free tier is keyless at 30 requests/minute, with data delayed up to 15 seconds, and a free key raises the monthly quota. Pro is $99/month at 300/minute with real-time data. Monthly quotas change, so read the current figures from [pricing](https://dexpaprika.com/api/pricing).
+No API key, no registration to start. The free tier is keyless, with data delayed up to 15 seconds, and a free key raises both the monthly quota and the per-minute rate. Pro is $99/month at 300/minute with real-time data. Monthly quotas change, so read the current figures from [pricing](https://dexpaprika.com/api/pricing).
 Streaming is metered the same way as REST: each delivered update counts as one credit. Commercial use requires attribution (do-follow link).
 
 Need higher limits or SLA? Contact support@coinpaprika.com
