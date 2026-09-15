@@ -121,7 +121,7 @@ Only the 6h, 1h and 5m windows are pools-only. The token endpoint rejects those 
 
 SSE price feeds. Updates are swap-driven, pushed when a swap moves the price, not on a fixed cadence and not per block.
 
-Keyless streaming covers 35 showcase tokens, one per chain. A free API key opens streaming for any token. Either way you get up to 10 concurrent streams per IP and 25 subscriptions per POST connection. If a keyless stream connects but only ever delivers `ping` frames, the token you asked for is not one of the showcase 35:
+Keyless streaming covers 35 showcase tokens, one per chain. A free API key opens streaming for any token. Either way you get up to 10 concurrent streams per IP and 25 subscriptions per POST connection. A token outside that set is refused at connect time with `403` and an `error` of `preview_only`, so you find out immediately rather than by waiting. Match on the `error` field, not the message text. A showcase token that connects `200` and then sits quiet is not a fault: updates are pushed only when a swap moves the price, and a thinly traded asset can go minutes without one.
 
 ```bash
 # Single token
