@@ -15,7 +15,7 @@ use std::process::ExitCode;
     version,
     about = "dexpaprika-cli: DEX data from your terminal",
     long_about = "dexpaprika-cli: DEX data from your terminal\n\n\
-                   Pools · Tokens · On-chain trades · 36 chains · Streaming\n\n\
+                   Pools · Tokens · On-chain trades · 35 chains · Streaming\n\n\
                    REST API: no API key needed to start\n\
                    Streaming: metered like REST, one update = one credit\n\
                    Plans: https://dexpaprika.com/pricing\n\n\
