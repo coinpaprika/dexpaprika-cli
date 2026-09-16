@@ -19,7 +19,7 @@ dexpaprika-cli search uniswap
 
 ## No setup required
 
-No API key, no registration to start. The free tier is keyless, with data delayed up to 60 seconds, and a free key raises both the monthly quota and the per-minute rate. Pro is $99/month at 300/minute with real-time data. Monthly quotas change, so read the current figures from [pricing](https://dexpaprika.com/api/pricing).
+No API key, no registration to start. The free tier is keyless, with data delayed up to 60 seconds, and a free key raises both the monthly quota and the per-minute rate. Paid plans are real-time: Dev is $30/month at 120/minute and Pro is $99/month at 500/minute. Monthly quotas change, so read the current figures from [pricing](https://dexpaprika.com/api/pricing).
 Streaming is metered the same way as REST: each delivered update counts as one credit. Commercial use requires attribution (do-follow link).
 
 Need higher limits or SLA? Contact support@coinpaprika.com
@@ -28,10 +28,10 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 
 **The CLI works without a key and always will.** Nothing above needs one.
 
-A free key raises the monthly credit allowance. It does **not** raise the
-per-minute limit, which is the same on both free tiers, so reach for one when you
-are running out of monthly credits rather than hitting rate limits. Current
-figures: [rate limits](https://docs.dexpaprika.com/knowledge-base/rate-limits).
+A free key raises both the credit allowance and the per-minute limit: keyless
+runs at 15 requests a minute and a registered key at 30. Reach for one when you
+are hitting either ceiling. Current figures:
+[rate limits](https://docs.dexpaprika.com/knowledge-base/rate-limits).
 
 ```bash
 dexpaprika-cli config set-key api_YOUR_KEY   # validates against the API, then stores it
