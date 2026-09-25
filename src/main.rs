@@ -260,23 +260,23 @@ enum Commands {
     /// Get OHLCV data for a pool
     #[command(
         name = "pool-ohlcv",
-        after_help = "EXAMPLES:\n  dexpaprika-cli pool-ohlcv ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --start 2025-01-01"
+        after_help = "EXAMPLES:\n  dexpaprika-cli pool-ohlcv ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --start -24h --interval 1h --limit 24\n  dexpaprika-cli pool-ohlcv ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --start -7d --interval 1h --limit 168  # free key\n\nHISTORY BY PLAN:\n  Without a key: the last 24 hours at 1h, 6h, 12h and 24h.\n  Free key: 7 days at 10m and longer. Dev: 30 days, every interval. Pro: unlimited.\n  A request outside your plan is answered with 403. https://docs.dexpaprika.com/knowledge-base/rate-limits#ohlcv-limits-by-plan"
     )]
     PoolOhlcv {
         /// Network ID
         network: String,
         /// Pool contract address
         pool_address: String,
-        /// Start date (unix timestamp, RFC3339, or yyyy-mm-dd)
-        #[arg(long)]
+        /// Start: an offset back from now (-24h, -7d, -90m), unix timestamp, RFC3339, or yyyy-mm-dd
+        #[arg(long, allow_hyphen_values = true)]
         start: String,
-        /// End date
-        #[arg(long)]
+        /// End (optional), same formats as --start
+        #[arg(long, allow_hyphen_values = true)]
         end: Option<String>,
-        /// Interval (1m, 5m, 10m, 15m, 30m, 1h, 6h, 12h, 24h)
+        /// Interval (1m, 5m, 10m, 15m, 30m, 1h, 6h, 12h, 24h); without a key 1h and longer
         #[arg(long, default_value = "24h")]
         interval: String,
-        /// Maximum number of data points (max 366)
+        /// Maximum number of data points (max 1000)
         #[arg(long, default_value = "50")]
         limit: usize,
         /// Invert the price ratio
@@ -825,6 +825,39 @@ async fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pool_ohlcv_takes_a_relative_start_as_a_separate_argument() {
+        // clap reads a value starting with '-' as a flag unless told otherwise,
+        // so `--start -24h` failed with "unexpected argument '-2'".
+        let cli = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "pool-ohlcv",
+            "ethereum",
+            "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+            "--start",
+            "-24h",
+            "--end",
+            "-1h",
+            "--interval",
+            "1h",
+        ])
+        .expect("--start -24h must parse");
+
+        match cli.command {
+            Commands::PoolOhlcv {
+                start,
+                end,
+                interval,
+                ..
+            } => {
+                assert_eq!(start, "-24h");
+                assert_eq!(end.as_deref(), Some("-1h"));
+                assert_eq!(interval, "1h");
+            }
+            _ => panic!("expected the pool-ohlcv subcommand"),
+        }
+    }
 
     #[test]
     fn dex_pools_keeps_the_positional_dex_and_takes_a_cursor() {

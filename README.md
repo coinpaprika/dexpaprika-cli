@@ -67,7 +67,7 @@ directory.
 | `pool` | Pool details | `dexpaprika-cli pool ethereum 0x88e6...` |
 | `dex-pools` | Pools on a specific DEX | `dexpaprika-cli dex-pools ethereum uniswap_v3 --limit 5` |
 | `transactions` | Recent pool transactions | `dexpaprika-cli transactions ethereum 0x88e6...` |
-| `pool-ohlcv` | Pool OHLCV data | `dexpaprika-cli pool-ohlcv ethereum 0x88e6... --start 2025-01-01` |
+| `pool-ohlcv` | Pool OHLCV data | `dexpaprika-cli pool-ohlcv ethereum 0x88e6... --start -24h --interval 1h` |
 | `token` | Token details | `dexpaprika-cli token ethereum 0xc02a...` |
 | `token-pools` | Pools containing a token | `dexpaprika-cli token-pools ethereum 0xc02a...` |
 | `prices` | Batch token prices | `dexpaprika-cli prices ethereum --tokens 0xc02a...,0xdac1...` |
@@ -116,6 +116,16 @@ dexpaprika-cli --output json pools ethereum --order-by price_change_percentage_5
 The eight bounds are `--price-change-{24h,6h,1h,5m}-{min,max}`. Tables carry the 24h change, so ask for `--output json` when you want the 6h, 1h and 5m numbers back.
 
 Only the 6h, 1h and 5m windows are pools-only. The token endpoint rejects those three as sort fields and quietly ignores them as bounds, which is the nastier half: an ignored bound comes back `200` with the unfiltered page. The 24h window works on both sides, so `top-tokens` sorts by it and `filter-tokens` takes `--price-change-24h-min` and `--price-change-24h-max`.
+
+## OHLCV history
+
+`--start` and `--end` take an offset back from now (`-24h`, `-7d`, `-90m`) as well as a unix timestamp, RFC3339 or `yyyy-mm-dd`.
+
+```bash
+dexpaprika-cli pool-ohlcv ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --start -24h --interval 1h --limit 24
+```
+
+How far back you can go and how fine the candles can be depends on your plan. Without a key: the last 24 hours at `1h`, `6h`, `12h` and `24h`. A [free key](https://console.dexpaprika.com) opens 7 days at `10m` and longer; Dev 30 days at every interval; Pro unlimited. A request outside your plan is answered with `403` and a message naming the plan that lifts the limit. Full table: [OHLCV limits by plan](https://docs.dexpaprika.com/knowledge-base/rate-limits#ohlcv-limits-by-plan). The default `--interval` is `24h`, so ask for `1h` when you want more than one candle a day.
 
 ## Streaming
 
