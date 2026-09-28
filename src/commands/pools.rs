@@ -199,8 +199,8 @@ pub async fn execute_pool_filter(
     liquidity_usd_max: Option<f64>,
     txns_24h_min: Option<u64>,
     price_change: PriceChangeBounds,
-    created_after: Option<u64>,
-    created_before: Option<u64>,
+    created_after: Option<&str>,
+    created_before: Option<&str>,
     sort_by: &str,
     sort_dir: &str,
     limit: usize,
@@ -208,6 +208,8 @@ pub async fn execute_pool_filter(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    check_time("--created-after", created_after)?;
+    check_time("--created-before", created_before)?;
     let limit_str = limit.to_string();
     let order_by = crate::commands::search_mapping::map_pool_sort_field(sort_by);
     // Search is cursor-paginated: no "page" param. "order_by" is the sort field,
@@ -400,22 +402,22 @@ pub async fn execute_transactions(
     pool_address: &str,
     limit: usize,
     cursor: Option<&str>,
-    from: Option<i64>,
-    to: Option<i64>,
+    from: Option<&str>,
+    to: Option<&str>,
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    check_time("--from", from)?;
+    check_time("--to", to)?;
     let limit_str = limit.to_string();
-    let from_str = from.map(|f| f.to_string());
-    let to_str = to.map(|t| t.to_string());
     let mut params: Vec<(&str, &str)> = vec![("limit", &limit_str)];
     if let Some(c) = cursor {
         params.push(("cursor", c));
     }
-    if let Some(ref f) = from_str {
+    if let Some(f) = from {
         params.push(("from", f));
     }
-    if let Some(ref t) = to_str {
+    if let Some(t) = to {
         params.push(("to", t));
     }
     let resp: TransactionsResponse = client
@@ -440,10 +442,11 @@ pub async fn execute_transactions(
     Ok(())
 }
 
-/// A time the OHLCV endpoint accepts for `start` and `end`: a unix timestamp,
+/// A time the API accepts for OHLCV `start` and `end`, transactions `from` and
+/// `to`, and search `created_after` and `created_before`: a unix timestamp,
 /// yyyy-mm-dd, RFC3339, or an offset back from now such as `-24h`, `-7d`,
 /// `-90m` or `-30s` (the API takes up to nine digits and s, m, h or d).
-fn is_ohlcv_time(s: &str) -> bool {
+pub(crate) fn is_api_time(s: &str) -> bool {
     let is_unix = !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
     let is_date = s.len() == 10 && s.chars().nth(4) == Some('-') && s.chars().nth(7) == Some('-');
     let is_rfc3339 = s.contains('T');
@@ -460,6 +463,16 @@ fn is_ohlcv_time(s: &str) -> bool {
     is_unix || is_date || is_rfc3339 || is_relative
 }
 
+/// Reject a time flag the API would answer with 400, naming the flag.
+pub(crate) fn check_time(flag: &str, value: Option<&str>) -> Result<()> {
+    if let Some(v) = value.filter(|v| !is_api_time(v)) {
+        anyhow::bail!(
+            "Invalid {flag} format: \"{v}\". Use a relative offset (-24h, -7d, -90m), yyyy-mm-dd, unix timestamp, or RFC3339."
+        );
+    }
+    Ok(())
+}
+
 pub async fn execute_ohlcv(
     client: &ApiClient,
     network: &str,
@@ -472,12 +485,12 @@ pub async fn execute_ohlcv(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
-    if !is_ohlcv_time(start) {
+    if !is_api_time(start) {
         anyhow::bail!(
             "Invalid --start format: \"{start}\". Use a relative offset (-24h, -7d, -90m), yyyy-mm-dd, unix timestamp, or RFC3339."
         );
     }
-    if let Some(e) = end.filter(|e| !is_ohlcv_time(e)) {
+    if let Some(e) = end.filter(|e| !is_api_time(e)) {
         anyhow::bail!(
             "Invalid --end format: \"{e}\". Use a relative offset (-1h), yyyy-mm-dd, unix timestamp, or RFC3339."
         );
@@ -522,21 +535,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ohlcv_time_accepts_relative_offsets() {
+    fn api_time_accepts_relative_offsets() {
         for ok in ["-24h", "-7d", "-90m", "-30s", "-24H", "-999999999s"] {
-            assert!(is_ohlcv_time(ok), "{ok} should be accepted");
+            assert!(is_api_time(ok), "{ok} should be accepted");
         }
     }
 
     #[test]
-    fn ohlcv_time_still_accepts_absolute_formats() {
+    fn api_time_still_accepts_absolute_formats() {
         for ok in ["1758758400", "2026-09-25", "2026-09-25T00:00:00Z"] {
-            assert!(is_ohlcv_time(ok), "{ok} should be accepted");
+            assert!(is_api_time(ok), "{ok} should be accepted");
         }
     }
 
     #[test]
-    fn ohlcv_time_rejects_what_the_api_would_400() {
+    fn api_time_rejects_what_the_api_would_400() {
         for bad in [
             "",
             "-",
@@ -549,7 +562,37 @@ mod tests {
             "-1é",
             "yesterday",
         ] {
-            assert!(!is_ohlcv_time(bad), "{bad:?} should be rejected");
+            assert!(!is_api_time(bad), "{bad:?} should be rejected");
+        }
+    }
+
+    #[test]
+    fn check_time_passes_every_shape_the_api_takes() {
+        // The transactions and search filters take the same shapes as OHLCV
+        // start since dexpaprika-go #2421 (28 Sep 2026).
+        for ok in [
+            "-24h",
+            "-7D",
+            "1790000000",
+            "2026-09-24",
+            "2026-09-24T10:00:00Z",
+        ] {
+            assert!(check_time("--from", Some(ok)).is_ok(), "{ok} should pass");
+        }
+        assert!(
+            check_time("--from", None).is_ok(),
+            "an absent flag is not an error"
+        );
+    }
+
+    #[test]
+    fn check_time_names_the_flag_it_rejects() {
+        for bad in ["yesterday", "-24", "-24x", "24h"] {
+            let err = check_time("--created-after", Some(bad))
+                .expect_err("should be rejected")
+                .to_string();
+            assert!(err.contains("--created-after"), "{err}");
+            assert!(err.contains(bad), "{err}");
         }
     }
 

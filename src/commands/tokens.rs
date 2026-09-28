@@ -294,11 +294,13 @@ pub async fn execute_filter_tokens(
     txns_24h_min: Option<u64>,
     price_change_24h_min: Option<f64>,
     price_change_24h_max: Option<f64>,
-    created_after: Option<u64>,
-    created_before: Option<u64>,
+    created_after: Option<&str>,
+    created_before: Option<&str>,
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    super::pools::check_time("--created-after", created_after)?;
+    super::pools::check_time("--created-before", created_before)?;
     let limit_str = limit.to_string();
     let order_by = crate::commands::search_mapping::map_token_sort_field(sort_by);
     // Search is cursor-paginated: no "page". "order_by"/"sort" replace

@@ -127,6 +127,15 @@ dexpaprika-cli pool-ohlcv ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --
 
 How far back you can go and how fine the candles can be depends on your plan. Without a key: the last 24 hours at `1h`, `6h`, `12h` and `24h`. A [free key](https://console.dexpaprika.com) opens 7 days at `10m` and longer; Dev 30 days at every interval; Pro unlimited. A request outside your plan is answered with `403` and a message naming the plan that lifts the limit. Full table: [OHLCV limits by plan](https://docs.dexpaprika.com/knowledge-base/rate-limits#ohlcv-limits-by-plan). The default `--interval` is `24h`, so ask for `1h` when you want more than one candle a day.
 
+## Time filters
+
+`--from` and `--to` on `transactions`, and `--created-after` and `--created-before` on `pool-filter` and `filter-tokens`, take the same shapes as `--start`: an offset back from now (`-1h`, `-24h`, `-7d`), a unix timestamp, RFC3339 or `yyyy-mm-dd`.
+
+```bash
+dexpaprika-cli transactions ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --from -1h
+dexpaprika-cli pool-filter solana --created-after -24h --sort-by created_at
+```
+
 ## Streaming
 
 SSE price feeds. Updates are swap-driven, pushed when a swap moves the price, not on a fixed cadence and not per block.

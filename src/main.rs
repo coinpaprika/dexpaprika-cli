@@ -122,7 +122,7 @@ enum Commands {
     /// Filter pools by volume, liquidity, transactions, price change, and creation date
     #[command(
         name = "pool-filter",
-        after_help = "EXAMPLES:\n  dexpaprika-cli pool-filter ethereum --volume-24h-min 100000\n  dexpaprika-cli pool-filter solana --liquidity-usd-min 50000 --sort-by liquidity\n  dexpaprika-cli pool-filter ethereum --price-change-1h-min 50 --sort-by price_change_percentage_1h\n  dexpaprika-cli pool-filter ethereum --price-change-24h-max -20\n\nPRICE CHANGE BOUNDS:\n  Percentages, and negative values are the point: --price-change-24h-max -20 means\n  down 20% or more over 24h. Write -0.5 rather than -.5, which clap reads as a flag.\n  The 6h, 1h and 5m windows exist for pools only.\n  The table shows the 24h change; all four windows come back in --output json."
+        after_help = "EXAMPLES:\n  dexpaprika-cli pool-filter ethereum --volume-24h-min 100000\n  dexpaprika-cli pool-filter solana --liquidity-usd-min 50000 --sort-by liquidity\n  dexpaprika-cli pool-filter ethereum --price-change-1h-min 50 --sort-by price_change_percentage_1h\n  dexpaprika-cli pool-filter ethereum --price-change-24h-max -20\n  dexpaprika-cli pool-filter solana --created-after -24h --sort-by created_at\n\nPRICE CHANGE BOUNDS:\n  Percentages, and negative values are the point: --price-change-24h-max -20 means\n  down 20% or more over 24h. Write -0.5 rather than -.5, which clap reads as a flag.\n  The 6h, 1h and 5m windows exist for pools only.\n  The table shows the 24h change; all four windows come back in --output json."
     )]
     PoolFilter {
         /// Network ID (e.g., ethereum, solana)
@@ -172,12 +172,12 @@ enum Commands {
         /// Maximum 5m price change, in percent (negative allowed)
         #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
         price_change_5m_max: Option<f64>,
-        /// Only pools created after this UNIX timestamp
-        #[arg(long)]
-        created_after: Option<u64>,
-        /// Only pools created before this UNIX timestamp
-        #[arg(long)]
-        created_before: Option<u64>,
+        /// Only pools created at or after this time: an offset back from now (-24h, -7d, -90m), unix timestamp, RFC3339, or yyyy-mm-dd
+        #[arg(long, allow_hyphen_values = true)]
+        created_after: Option<String>,
+        /// Only pools created at or before this time, same formats as --created-after
+        #[arg(long, allow_hyphen_values = true)]
+        created_before: Option<String>,
         /// Sort by field: volume_24h, volume_7d, volume_30d, liquidity, txns_24h, created_at,
         /// price_usd, price_change_percentage_24h, price_change_percentage_6h,
         /// price_change_percentage_1h, price_change_percentage_5m
@@ -236,7 +236,7 @@ enum Commands {
 
     /// Get recent transactions for a pool
     #[command(
-        after_help = "EXAMPLES:\n  dexpaprika-cli transactions ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --limit 20\n  dexpaprika-cli transactions ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --from 1712700000 --to 1712800000"
+        after_help = "EXAMPLES:\n  dexpaprika-cli transactions ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --limit 20\n  dexpaprika-cli transactions ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --from 1712700000 --to 1712800000\n  dexpaprika-cli transactions ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --from -1h"
     )]
     Transactions {
         /// Network ID
@@ -249,12 +249,12 @@ enum Commands {
         /// Cursor for pagination
         #[arg(long)]
         cursor: Option<String>,
-        /// Filter transactions starting from this UNIX timestamp (inclusive, max 7 days)
-        #[arg(long)]
-        from: Option<i64>,
-        /// Filter transactions up to this UNIX timestamp (exclusive)
-        #[arg(long)]
-        to: Option<i64>,
+        /// Filter transactions starting from this time (inclusive, max 7 days): an offset back from now (-24h, -7d, -90m), unix timestamp, RFC3339, or yyyy-mm-dd
+        #[arg(long, allow_hyphen_values = true)]
+        from: Option<String>,
+        /// Filter transactions up to this time (exclusive), same formats as --from
+        #[arg(long, allow_hyphen_values = true)]
+        to: Option<String>,
     },
 
     /// Get OHLCV data for a pool
@@ -363,12 +363,12 @@ enum Commands {
         /// Maximum 24h price change, in percent (negative allowed)
         #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
         price_change_24h_max: Option<f64>,
-        /// Only tokens created after this UNIX timestamp
-        #[arg(long)]
-        created_after: Option<u64>,
-        /// Only tokens created before this UNIX timestamp
-        #[arg(long)]
-        created_before: Option<u64>,
+        /// Only tokens created at or after this time: an offset back from now (-24h, -7d, -90m), unix timestamp, RFC3339, or yyyy-mm-dd
+        #[arg(long, allow_hyphen_values = true)]
+        created_after: Option<String>,
+        /// Only tokens created at or before this time, same formats as --created-after
+        #[arg(long, allow_hyphen_values = true)]
+        created_before: Option<String>,
     },
 
     /// Get top tokens on a network ranked by volume, price, liquidity, or activity
@@ -580,8 +580,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
                     price_change_5m_min,
                     price_change_5m_max,
                 },
-                created_after,
-                created_before,
+                created_after.as_deref(),
+                created_before.as_deref(),
                 &sort_by,
                 &sort_dir,
                 limit,
@@ -641,8 +641,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
                 &pool_address,
                 limit,
                 cursor.as_deref(),
-                from,
-                to,
+                from.as_deref(),
+                to.as_deref(),
                 output,
                 raw,
             )
@@ -728,8 +728,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
                 txns_24h_min,
                 price_change_24h_min,
                 price_change_24h_max,
-                created_after,
-                created_before,
+                created_after.as_deref(),
+                created_before.as_deref(),
                 output,
                 raw,
             )
@@ -825,6 +825,72 @@ async fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn transactions_take_relative_from_and_to() {
+        let cli = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "transactions",
+            "ethereum",
+            "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+            "--from",
+            "-1h",
+            "--to",
+            "-5m",
+        ])
+        .expect("--from -1h must parse");
+
+        match cli.command {
+            Commands::Transactions { from, to, .. } => {
+                assert_eq!(from.as_deref(), Some("-1h"));
+                assert_eq!(to.as_deref(), Some("-5m"));
+            }
+            _ => panic!("expected the transactions subcommand"),
+        }
+    }
+
+    #[test]
+    fn pool_filter_takes_a_relative_created_after() {
+        let cli = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "pool-filter",
+            "solana",
+            "--created-after",
+            "-24h",
+        ])
+        .expect("--created-after -24h must parse");
+
+        match cli.command {
+            Commands::PoolFilter {
+                created_after,
+                created_before,
+                ..
+            } => {
+                assert_eq!(created_after.as_deref(), Some("-24h"));
+                assert_eq!(created_before, None);
+            }
+            _ => panic!("expected the pool-filter subcommand"),
+        }
+    }
+
+    #[test]
+    fn filter_tokens_still_takes_unix_seconds() {
+        let cli = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "filter-tokens",
+            "ethereum",
+            "--created-before",
+            "1790000000",
+        ])
+        .expect("a plain unix timestamp must keep working");
+
+        match cli.command {
+            Commands::FilterTokens { created_before, .. } => {
+                assert_eq!(created_before.as_deref(), Some("1790000000"));
+            }
+            _ => panic!("expected the filter-tokens subcommand"),
+        }
+    }
 
     #[test]
     fn pool_ohlcv_takes_a_relative_start_as_a_separate_argument() {
