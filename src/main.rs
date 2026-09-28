@@ -15,10 +15,10 @@ use std::process::ExitCode;
     version,
     about = "dexpaprika-cli: DEX data from your terminal",
     long_about = "dexpaprika-cli: DEX data from your terminal\n\n\
-                   Pools · Tokens · On-chain trades · 35 chains · Streaming\n\n\
+                   Pools · Tokens · On-chain trades · 36 chains · Streaming\n\n\
                    REST API: no API key needed to start\n\
                    Streaming: metered like REST, one update = one credit\n\
-                   Plans: https://dexpaprika.com/pricing\n\n\
+                   Plans: https://dexpaprika.com/api/pricing\n\n\
                    Quick start:  dexpaprika-cli onboard\n\
                    API docs:     https://api.dexpaprika.com\n\
                    Docs:         https://docs.dexpaprika.com\n\
@@ -447,6 +447,9 @@ enum Commands {
         dexpaprika-cli stream-reserves ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --method pool_reserves\n  \
         dexpaprika-cli stream-reserves ethereum 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 --method token_reserves --limit 10\n  \
         dexpaprika-cli stream-reserves --subscriptions reserves.json\n\n\
+        API KEY:\n  \
+        Needs a free key from https://console.dexpaprika.com. Store it with `dexpaprika-cli config set-key <key>`,\n  \
+        set DEXPAPRIKA_API_KEY, or pass --api-key. Keyless, the stream is refused with 403 preview_only.\n\n\
         METHODS:\n  \
         pool_reserves    Subscribe to one specific pool (fires a 'pool_reserves' event with a nested tokens array when reserves change)\n  \
         token_reserves   Subscribe to one token (fires a 'token_reserves' event per pool containing it; high volume on USDC etc)\n\n\

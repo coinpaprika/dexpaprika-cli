@@ -1,12 +1,15 @@
 # DexPaprika Streaming Skill (CLI)
 
-Two SSE feeds, one transport. Free tier, no API key needed to start. Keyless streaming
-covers 35 showcase tokens, one per chain; a free API key opens streaming for any token.
+The CLI wraps two of the four SSE feeds. Price streams start without an API key: keyless
+streaming covers 35 showcase tokens, and a free API key opens streaming for any token.
+Reserve streams need a free key.
 
 - `dexpaprika-cli stream …` for live token prices (`/sse/prices`).
-- `dexpaprika-cli stream-reserves …` for pool reserves (`/sse/reserves`), emitted when a swap moves a pool's reserves.
+- `dexpaprika-cli stream-reserves …` for pool reserves (`/sse/reserves`), emitted when a swap moves a pool's reserves. Needs a free API key.
 
-**Limits:** 25 subscriptions per POST connection. 10 concurrent SSE streams per IP. A `ping` event lands every 15s. Keyless is limited to the 35 showcase tokens, one per chain.
+The other two feeds, `/sse/transactions` (individual swaps, free key) and `/sse/ohlcv` (candles, Pro), are not wrapped by the CLI; see the docs linked at the end.
+
+**Limits:** 25 subscriptions per POST connection. 10 concurrent SSE streams per IP. A `ping` event lands every 15s. Keyless is limited to price streams on the 35 showcase tokens.
 
 ---
 
@@ -44,6 +47,8 @@ Watchlist file format:
 ```
 
 ### Stream reserves
+
+Needs a free API key from [console.dexpaprika.com](https://console.dexpaprika.com). Pass `--api-key`, set `DEXPAPRIKA_API_KEY`, or store it once with `dexpaprika-cli config set-key`. Without one the stream is refused with `403 preview_only`.
 
 ```bash
 # Single pool: fires on every reserve change in that pool
@@ -133,6 +138,8 @@ One invalid asset cancels the entire stream with HTTP 400. Validate addresses wi
 
 ### Stream reserves (GET, single)
 
+Free key required, sent as the whole `Authorization` header value.
+
 ```
 GET /sse/reserves?method=pool_reserves&chain={network}&address={pool_address}
 GET /sse/reserves?method=token_reserves&chain={network}&address={token_address}
@@ -206,7 +213,7 @@ Body: JSON array of `{"chain", "address", "method": "pool_reserves"|"token_reser
 }
 ```
 
-The legacy single `reserve_update` event no longer exists. A consumer that matched it must switch to `pool_reserves` and `token_reserves`. The legacy `t_p` event and compact `{a, c, p, t, t_p}` shape exist on the deprecated `/stream` path only. New code should not use them.
+The legacy single `reserve_update` event no longer exists. A consumer that matched it must switch to `pool_reserves` and `token_reserves`. `method=t_p` still answers on `/sse/prices` with the legacy compact `{a, c, p, t, t_p}` shape. It is not in the spec; new code should use `token_price`.
 
 ---
 
@@ -225,6 +232,7 @@ The legacy single `reserve_update` event no longer exists. A consumer that match
 | 200 | Connected, streaming | (SSE event stream) |
 | 400 | Bad params, unsupported chain, asset not found, one invalid asset in a batch | `{"message": "..."}` |
 | 400 | Too many entries in POST body | `{"message":"too many assets, max 25 allowed"}` for `/sse/prices`; `{"message":"too many subscriptions"}` for `/sse/reserves` |
+| 403 | Keyless on a non-showcase token, or on `/sse/reserves` | `{"error":"preview_only","tier":"keyless","message":"...","links":{...}}`. Match on `error`, not the message |
 | 429 | IP stream limit (10 concurrent) | `{"message":"ip stream limit exceeded"}` |
 
 In-stream errors arrive as `event: error` SSE messages and terminate the stream.
@@ -268,7 +276,7 @@ Find others via REST API `/networks/{chain}/pools/search?token_address={address}
 
 ## Deprecated paths
 
-`/stream` and `/reserves/stream` are predecessors. `/stream` still works but emits a one-shot `warning` event on connect telling clients to migrate to `/sse/prices`. `/reserves/stream` was retired and now returns 404. New code must use `/sse/prices` and `/sse/reserves`.
+`/stream` and `/reserves/stream` are predecessors and both are gone: `/stream` returns `410` with `"replacement":"/sse/prices"`, and `/reserves/stream` returns 404. New code must use `/sse/prices` and `/sse/reserves`.
 
 ---
 

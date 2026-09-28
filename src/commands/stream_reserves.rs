@@ -283,6 +283,10 @@ async fn stream_single(
                         }
                     }
                     Some(Ok(Event::Open)) => {}
+                    Some(Err(reqwest_eventsource::Error::InvalidStatusCode(status, resp))) => {
+                        let body = resp.text().await.unwrap_or_default();
+                        bail!("{}", crate::client::stream_refusal(status, &body));
+                    }
                     Some(Err(e)) => {
                         bail!("Stream error: {e}");
                     }
@@ -391,7 +395,7 @@ async fn stream_multi(
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        bail!("Stream POST error {status}: {body}");
+        bail!("{}", crate::client::stream_refusal(status, &body));
     }
 
     let mut stream = resp.bytes_stream();
