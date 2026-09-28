@@ -1,8 +1,8 @@
 [package]
 name = "dexpaprika-cli"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
-description = "DexPaprika CLI: DEX data from the terminal. Pools, tokens, on-chain trades across 35 chains. Free tier, no API key needed to start."
+description = "DexPaprika CLI: DEX data from the terminal. Pools, tokens, on-chain trades across 36 chains. Free tier, no API key needed to start."
 license = "MIT"
 repository = "https://github.com/coinpaprika/dexpaprika-cli"
 keywords = ["dexpaprika", "dex", "defi", "cli", "cryptocurrency"]

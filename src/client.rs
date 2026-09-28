@@ -11,10 +11,7 @@ pub struct ApiClient {
 impl ApiClient {
     /// Client that sends an API key when one is configured.
     ///
-    /// The key is the ENTIRE `Authorization` value. There is no `Bearer` prefix
-    /// and no other scheme word: the API checksums the raw header, so a scheme
-    /// word returns 401. This is the most common reason a working key looks
-    /// broken.
+    /// The key is the ENTIRE `Authorization` value, with nothing in front of it.
     ///
     /// The host is never inferred from the key. Free keys are served from the
     /// default base and only Pro moves to api-pro.dexpaprika.com; sending a free
@@ -40,8 +37,8 @@ impl ApiClient {
     ///
     /// Used by the streaming commands, which build their own requests rather
     /// than going through `dexpaprika_get`. Streaming authenticates the same way
-    /// as REST: verified on the wire, a bad key there returns 401 and no key
-    /// returns 200.
+    /// as REST: a bad key returns 401, and no key is served keyless, which covers
+    /// price streams on the showcase tokens only (see `stream_refusal`).
     pub fn authorize(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         match &self.api_key {
             Some(key) => req.header("Authorization", key),
@@ -129,9 +126,59 @@ fn deprecation_hint(status: StatusCode, body: &str) -> Option<String> {
     }
 }
 
+/// Turn a refused stream connection into a message that says what to do next.
+///
+/// Keyless streaming covers price streams on the showcase tokens only. Any other
+/// token, and the reserves feed, is refused at connect time with 403 and
+/// `"error":"preview_only"`; without this the caller saw a bare status code.
+/// Keys on the `error` field, never on the message text.
+pub fn stream_refusal(status: StatusCode, body: &str) -> String {
+    if let Some(hint) = deprecation_hint(status, body) {
+        return hint;
+    }
+    let preview_only = serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|v| v.get("error")?.as_str().map(|e| e == "preview_only"))
+        .unwrap_or(false);
+    if preview_only {
+        return format!(
+            "This stream needs an API key ({status}, preview_only). Keyless streaming covers \
+             price streams on the showcase tokens only; a free key opens every token and the \
+             reserves feed. Get one at https://console.dexpaprika.com, then run \
+             `dexpaprika-cli config set-key <key>` or pass --api-key."
+        );
+    }
+    format!("Stream refused ({status}): {body}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stream_refusal_explains_preview_only() {
+        // Body as served by streaming.dexpaprika.com/sse/reserves, keyless, 2026-09-28.
+        let body = r#"{"error":"preview_only","tier":"keyless","message":"this stream requires an API key","links":{"register":"https://console.dexpaprika.com"}}"#;
+        let msg = stream_refusal(StatusCode::FORBIDDEN, body);
+        assert!(msg.contains("console.dexpaprika.com"));
+        assert!(msg.contains("config set-key"));
+        assert!(msg.contains("403"));
+    }
+
+    #[test]
+    fn stream_refusal_keys_on_error_field_not_status() {
+        let body = r#"{"error":"something_else","message":"nope"}"#;
+        let msg = stream_refusal(StatusCode::FORBIDDEN, body);
+        assert!(!msg.contains("config set-key"));
+        assert!(msg.contains("something_else"));
+    }
+
+    #[test]
+    fn stream_refusal_passes_through_non_json() {
+        let msg = stream_refusal(StatusCode::UNAUTHORIZED, "bad key");
+        assert!(msg.contains("401"));
+        assert!(msg.contains("bad key"));
+    }
 
     #[test]
     fn deprecation_hint_surfaces_replacement_and_message() {

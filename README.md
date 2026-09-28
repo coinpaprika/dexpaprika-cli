@@ -2,7 +2,7 @@
 
 > For agents: `curl -sSL https://raw.githubusercontent.com/coinpaprika/dexpaprika-cli/main/install.sh | sh`
 
-DEX data from your terminal. Pools, tokens, on-chain trades across 35 chains.
+DEX data from your terminal. Pools, tokens, on-chain trades across 36 chains.
 Free tier: no API key, no credit card, just start querying.
 
 ## Quick start
@@ -140,7 +140,7 @@ dexpaprika-cli pool-filter solana --created-after -24h --sort-by created_at
 
 SSE price feeds. Updates are swap-driven, pushed when a swap moves the price, not on a fixed cadence and not per block.
 
-Keyless streaming covers 35 showcase tokens, one per chain. A free API key opens streaming for any token. Either way you get up to 10 concurrent streams per IP and 25 subscriptions per POST connection. A token outside that set is refused at connect time with `403` and an `error` of `preview_only`, so you find out immediately rather than by waiting. Match on the `error` field, not the message text. A showcase token that connects `200` and then sits quiet is not a fault: updates are pushed only when a swap moves the price, and a thinly traded asset can go minutes without one.
+Keyless streaming covers price streams on 35 showcase tokens. A free API key opens streaming for any token. Either way you get up to 10 concurrent streams per IP and 25 subscriptions per POST connection. A token outside that set is refused at connect time with `403` and an `error` of `preview_only`, so you find out immediately rather than by waiting. Match on the `error` field, not the message text. A showcase token that connects `200` and then sits quiet is not a fault: updates are pushed only when a swap moves the price, and a thinly traded asset can go minutes without one.
 
 ```bash
 # Single token
@@ -155,8 +155,9 @@ dexpaprika-cli stream ethereum 0xc02a... --limit 50
 
 ## Streaming reserves
 
-`stream-reserves` tails reserve changes over SSE, emitted when a swap moves a pool's reserves. Two methods, each
-with its own event:
+`stream-reserves` tails reserve changes over SSE, emitted when a swap moves a pool's reserves. It needs a free API
+key from [console.dexpaprika.com](https://console.dexpaprika.com) (see [Optional API key](#optional-api-key) above); keyless, the
+stream is refused with `403` and `preview_only`. Two methods, each with its own event:
 
 - `pool_reserves`: one pool. Emits a `pool_reserves` event with a nested `tokens`
   array plus `timestamp` and `block_timestamp`.
