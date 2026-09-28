@@ -440,6 +440,26 @@ pub async fn execute_transactions(
     Ok(())
 }
 
+/// A time the OHLCV endpoint accepts for `start` and `end`: a unix timestamp,
+/// yyyy-mm-dd, RFC3339, or an offset back from now such as `-24h`, `-7d`,
+/// `-90m` or `-30s` (the API takes up to nine digits and s, m, h or d).
+fn is_ohlcv_time(s: &str) -> bool {
+    let is_unix = !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
+    let is_date = s.len() == 10 && s.chars().nth(4) == Some('-') && s.chars().nth(7) == Some('-');
+    let is_rfc3339 = s.contains('T');
+    let is_relative = s.strip_prefix('-').is_some_and(|rest| {
+        let digits = rest.len().saturating_sub(1);
+        rest.is_ascii()
+            && (1..=9).contains(&digits)
+            && rest[..digits].chars().all(|c| c.is_ascii_digit())
+            && matches!(
+                rest[digits..].to_ascii_lowercase().as_str(),
+                "s" | "m" | "h" | "d"
+            )
+    });
+    is_unix || is_date || is_rfc3339 || is_relative
+}
+
 pub async fn execute_ohlcv(
     client: &ApiClient,
     network: &str,
@@ -452,14 +472,14 @@ pub async fn execute_ohlcv(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
-    // Validate start date format
-    let is_unix = start.chars().all(|c| c.is_ascii_digit());
-    let is_date =
-        start.len() == 10 && start.chars().nth(4) == Some('-') && start.chars().nth(7) == Some('-');
-    let is_rfc3339 = start.contains('T');
-    if !is_unix && !is_date && !is_rfc3339 {
+    if !is_ohlcv_time(start) {
         anyhow::bail!(
-            "Invalid --start format: \"{start}\". Use yyyy-mm-dd, unix timestamp, or RFC3339."
+            "Invalid --start format: \"{start}\". Use a relative offset (-24h, -7d, -90m), yyyy-mm-dd, unix timestamp, or RFC3339."
+        );
+    }
+    if let Some(e) = end.filter(|e| !is_ohlcv_time(e)) {
+        anyhow::bail!(
+            "Invalid --end format: \"{e}\". Use a relative offset (-1h), yyyy-mm-dd, unix timestamp, or RFC3339."
         );
     }
 
@@ -500,6 +520,38 @@ pub async fn execute_ohlcv(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ohlcv_time_accepts_relative_offsets() {
+        for ok in ["-24h", "-7d", "-90m", "-30s", "-24H", "-999999999s"] {
+            assert!(is_ohlcv_time(ok), "{ok} should be accepted");
+        }
+    }
+
+    #[test]
+    fn ohlcv_time_still_accepts_absolute_formats() {
+        for ok in ["1758758400", "2026-09-25", "2026-09-25T00:00:00Z"] {
+            assert!(is_ohlcv_time(ok), "{ok} should be accepted");
+        }
+    }
+
+    #[test]
+    fn ohlcv_time_rejects_what_the_api_would_400() {
+        for bad in [
+            "",
+            "-",
+            "-h",
+            "-24",
+            "-24w",
+            "24h",
+            "-1.5h",
+            "-1234567890s",
+            "-1é",
+            "yesterday",
+        ] {
+            assert!(!is_ohlcv_time(bad), "{bad:?} should be rejected");
+        }
+    }
 
     /// One result object, copied verbatim from a live
     /// `/networks/ethereum/pools/search?limit=2&dex_name=curve` response
