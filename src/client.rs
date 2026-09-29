@@ -61,7 +61,7 @@ impl ApiClient {
         let mut req = self.http.get(&url);
 
         if let Some(key) = &self.api_key {
-            // The whole value, with no scheme word in front of it.
+            // The key alone is the entire Authorization value, nothing in front of it.
             req = req.header("Authorization", key);
         }
 
