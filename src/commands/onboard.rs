@@ -24,7 +24,7 @@ pub fn execute() -> Result<()> {
     println!("    raise the per-minute limit, which is the same on both free tiers.");
     println!("      dexpaprika-cli config set-key api_YOUR_KEY   # validates, then stores it");
     println!("      dexpaprika-cli config show                   # what the API makes of it");
-    println!("    Or set DEXPAPRIKA_API_KEY. Paste the key on its own: no Bearer prefix.");
+    println!("    Or set DEXPAPRIKA_API_KEY. Send the key on its own, nothing in front of it.");
     println!();
     println!("  Good to know:");
     println!("    Free and paid plans are available;");

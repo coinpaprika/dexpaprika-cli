@@ -187,8 +187,8 @@ pub fn mask_key(key: &str) -> String {
 mod tests {
     use super::*;
 
-    // The Bearer rule lives in client.rs, but sanitisation is what stops a
-    // pasted key from becoming a broken header in the first place.
+    // The send-the-key-alone rule lives in client.rs, but sanitisation is what
+    // stops a pasted key from becoming a broken header in the first place.
 
     #[test]
     fn a_normal_key_survives_untouched() {

@@ -49,9 +49,8 @@ pub async fn show(cli_key: Option<&str>, base_url: String) -> Result<()> {
             println!("API check failed: {err}");
             if key.is_some() {
                 println!();
-                println!("The key reached the API and was rejected. By far the most common");
-                println!("cause is a scheme word: the key is the entire Authorization value,");
-                println!("with no \"Bearer\" in front of it.");
+                println!("The key reached the API and was rejected. Check that the whole key");
+                println!("was pasted, with nothing in front of it.");
             }
         }
     }
@@ -94,8 +93,7 @@ pub async fn set_key(key: &str, base_url: String) -> Result<()> {
             bail!(
                 "The API rejected this key, so nothing was saved.\n\
                  {err}\n\n\
-                 The most common cause is a scheme word: the key is the entire \
-                 Authorization value, with no \"Bearer\" in front of it."
+                 Check that the whole key was pasted, with nothing in front of it."
             );
         }
     }

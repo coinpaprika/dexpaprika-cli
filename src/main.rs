@@ -56,7 +56,7 @@ pub(crate) enum ConfigCommands {
     Show,
     /// Validate a key against the API, then store it
     SetKey {
-        /// The key, exactly as issued. No "Bearer" prefix.
+        /// The key, exactly as issued, with nothing in front of it.
         key: String,
     },
     /// Forget the stored key
