@@ -15,6 +15,33 @@ use std::path::PathBuf;
 /// Environment variable consulted when no `--api-key` is passed.
 pub const API_KEY_ENV_VAR: &str = "DEXPAPRIKA_API_KEY";
 
+/// Environment variable consulted when no `--base-url` is passed.
+pub const BASE_URL_ENV_VAR: &str = "DEXPAPRIKA_API_BASE_URL";
+
+/// The REST host for keyless callers and free keys.
+pub const DEFAULT_BASE_URL: &str = "https://api.dexpaprika.com";
+
+/// The REST host for Dev, Pro and Enterprise keys.
+pub const PAID_BASE_URL: &str = "https://api-pro.dexpaprika.com";
+
+/// The REST host: `--base-url`, then `DEXPAPRIKA_API_BASE_URL`, then the free
+/// host. Never inferred from the key: a paid key is pointed at
+/// [`PAID_BASE_URL`] by whoever configures it.
+pub fn resolve_base_url(cli_base: Option<&str>) -> String {
+    let from_env = std::env::var(BASE_URL_ENV_VAR).ok();
+    pick_base_url(cli_base, from_env.as_deref())
+}
+
+fn pick_base_url(cli_base: Option<&str>, env_base: Option<&str>) -> String {
+    [cli_base, env_base]
+        .into_iter()
+        .flatten()
+        .map(|b| b.trim().trim_end_matches('/'))
+        .find(|b| !b.is_empty())
+        .unwrap_or(DEFAULT_BASE_URL)
+        .to_string()
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Config {
     pub api_key: Option<String>,
@@ -227,5 +254,31 @@ mod tests {
         // An empty --api-key is a mistake, not an instruction to ignore the
         // environment, so resolution continues past it.
         assert_eq!(key_source(Some("   ")), key_source(None));
+    }
+}
+
+#[cfg(test)]
+mod base_url_tests {
+    use super::{pick_base_url, DEFAULT_BASE_URL, PAID_BASE_URL};
+
+    #[test]
+    fn free_host_unless_told_otherwise() {
+        assert_eq!(pick_base_url(None, None), DEFAULT_BASE_URL);
+        assert_eq!(pick_base_url(Some("  "), Some("")), DEFAULT_BASE_URL);
+    }
+
+    #[test]
+    fn flag_beats_env_and_trailing_slash_is_dropped() {
+        assert_eq!(
+            pick_base_url(None, Some("https://api-pro.dexpaprika.com/")),
+            PAID_BASE_URL
+        );
+        assert_eq!(
+            pick_base_url(
+                Some("https://api-pro.dexpaprika.com"),
+                Some("https://example.test")
+            ),
+            PAID_BASE_URL
+        );
     }
 }

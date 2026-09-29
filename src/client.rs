@@ -13,10 +13,11 @@ impl ApiClient {
     ///
     /// The key is the ENTIRE `Authorization` value, with nothing in front of it.
     ///
-    /// The host is never inferred from the key. Free keys are served from the
-    /// default base and only Pro moves to api-pro.dexpaprika.com; sending a free
-    /// key there returns 403.
-    pub fn with_api_key(api_key: Option<String>) -> Self {
+    /// The host is never inferred from the key. Keyless callers and free keys
+    /// use api.dexpaprika.com; Dev, Pro and Enterprise keys use
+    /// api-pro.dexpaprika.com, selected with `--base-url` or
+    /// DEXPAPRIKA_API_BASE_URL (see `config::resolve_base_url`).
+    pub fn with_api_key(api_key: Option<String>, base_url: String) -> Self {
         let ua = format!(
             "dexpaprika-cli/{} ({}/{})",
             env!("CARGO_PKG_VERSION"),
@@ -28,7 +29,7 @@ impl ApiClient {
                 .user_agent(&ua)
                 .build()
                 .expect("failed to build HTTP client"),
-            dexpaprika_base: "https://api.dexpaprika.com".to_string(),
+            dexpaprika_base: base_url,
             api_key,
         }
     }
@@ -44,6 +45,11 @@ impl ApiClient {
             Some(key) => req.header("Authorization", key),
             None => req,
         }
+    }
+
+    /// The REST host this client calls.
+    pub fn base_url(&self) -> &str {
+        &self.dexpaprika_base
     }
 
     pub async fn dexpaprika_get<T: serde::de::DeserializeOwned>(
@@ -75,6 +81,15 @@ impl ApiClient {
             // self-document without waiting on a CLI release. This keys on the
             // field being present for ANY error status, not just 410.
             if let Some(hint) = deprecation_hint(status, &body) {
+                bail!("{hint}");
+            }
+
+            // Same idea, for a different gate: token OHLCV refuses keyless and
+            // free-key callers with 403 and this exact message. Keyed on the
+            // message text rather than the request path, the same way
+            // deprecation_hint keys on "replacement", so any endpoint that
+            // starts answering this way is covered without a per-endpoint switch.
+            if let Some(hint) = plan_gate_hint(status, &body) {
                 bail!("{hint}");
             }
 
@@ -124,6 +139,29 @@ fn deprecation_hint(status: StatusCode, body: &str) -> Option<String> {
             "This endpoint was removed. Use {replacement} instead. ({status})"
         )),
     }
+}
+
+/// Turn a plan-gated REST refusal into a message naming the plan and where to
+/// get one.
+///
+/// Token OHLCV is Dev, Pro and Enterprise only. A keyless or free-key caller
+/// gets 403 with `{"message":"this endpoint requires a Dev or Pro plan"}` and,
+/// without this, saw only the raw body. Matched on the exact message so an
+/// unrelated 403 (a bad key, a different gate) falls through to the generic
+/// error instead of picking up a hint that does not apply to it.
+fn plan_gate_hint(status: StatusCode, body: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(body).ok()?;
+    let message = value.get("message")?.as_str()?;
+    if message != "this endpoint requires a Dev or Pro plan" {
+        return None;
+    }
+    Some(format!(
+        "{message} ({status}). Token OHLCV needs a Dev or Pro plan; Dev covers the last 30 \
+         days of history. Get one at https://dexpaprika.com/api/pricing, then run \
+         `dexpaprika-cli config set-key <key>` and set \
+         DEXPAPRIKA_API_BASE_URL=https://api-pro.dexpaprika.com. Manage keys at \
+         https://console.dexpaprika.com."
+    ))
 }
 
 /// Turn a refused stream connection into a message that says what to do next.
@@ -215,5 +253,31 @@ mod tests {
     fn deprecation_hint_none_when_body_not_json() {
         assert!(deprecation_hint(StatusCode::GONE, "plain text error").is_none());
         assert!(deprecation_hint(StatusCode::GONE, "").is_none());
+    }
+
+    #[test]
+    fn plan_gate_hint_names_the_plan_and_links_pricing_and_console() {
+        // Body as documented for GET /networks/{network}/tokens/{address}/ohlcv.
+        let body = r#"{"message":"this endpoint requires a Dev or Pro plan"}"#;
+        let hint = plan_gate_hint(StatusCode::FORBIDDEN, body).expect("expected a hint");
+        assert!(hint.contains("this endpoint requires a Dev or Pro plan"));
+        assert!(hint.contains("Dev covers the last 30 days"));
+        assert!(hint.contains("https://dexpaprika.com/api/pricing"));
+        assert!(hint.contains("https://console.dexpaprika.com"));
+        assert!(hint.contains("403"));
+        assert!(!hint.contains("Bearer"));
+    }
+
+    #[test]
+    fn plan_gate_hint_none_for_an_unrelated_403() {
+        // A bad key, or any other 403, must not pick up the plan hint.
+        let body = r#"{"message":"invalid API key"}"#;
+        assert!(plan_gate_hint(StatusCode::FORBIDDEN, body).is_none());
+    }
+
+    #[test]
+    fn plan_gate_hint_none_when_body_not_json() {
+        assert!(plan_gate_hint(StatusCode::FORBIDDEN, "plain text error").is_none());
+        assert!(plan_gate_hint(StatusCode::FORBIDDEN, "").is_none());
     }
 }

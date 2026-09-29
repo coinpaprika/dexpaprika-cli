@@ -41,6 +41,12 @@ pub(crate) struct Cli {
     /// The CLI works without one; a key raises the monthly credit allowance.
     #[arg(long, global = true, value_name = "KEY")]
     pub(crate) api_key: Option<String>,
+
+    /// REST host. Beats DEXPAPRIKA_API_BASE_URL; defaults to https://api.dexpaprika.com.
+    ///
+    /// Dev, Pro and Enterprise keys use https://api-pro.dexpaprika.com.
+    #[arg(long, global = true, value_name = "URL")]
+    pub(crate) base_url: Option<String>,
 }
 
 /// Subcommands of `config`.
@@ -295,6 +301,30 @@ enum Commands {
         token_address: String,
     },
 
+    /// Get OHLCV data for a token. Needs a Dev or Pro plan
+    #[command(
+        name = "token-ohlcv",
+        after_help = "EXAMPLES:\n  dexpaprika-cli token-ohlcv ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --start -24h --interval 1h --limit 24\n  dexpaprika-cli token-ohlcv solana So11111111111111111111111111111111111111112 --start -7d --interval 1h --limit 168\n\nUSD candles for a token: a volume-weighted price across every pool it trades in on that\nnetwork, with volume the USD traded across all of them. There is no --inversed here; a token\nhas no second leg to invert against.\n\nPLAN:\n  Needs a Dev, Pro or Enterprise plan. Dev history covers the last 30 days; Pro and Enterprise\n  have no plan limit on history. Keyless and a free key are answered with 403 naming the plan.\n  Paid keys use https://api-pro.dexpaprika.com: set DEXPAPRIKA_API_BASE_URL or pass --base-url.\n  https://docs.dexpaprika.com/api-reference/tokens/get-ohlcv-data-for-a-token"
+    )]
+    TokenOhlcv {
+        /// Network ID
+        network: String,
+        /// Token contract address
+        token_address: String,
+        /// Start: an offset back from now (-24h, -7d, -90m), unix timestamp, RFC3339, or yyyy-mm-dd
+        #[arg(long, allow_hyphen_values = true)]
+        start: String,
+        /// End (optional), same formats as --start
+        #[arg(long, allow_hyphen_values = true)]
+        end: Option<String>,
+        /// Interval (1m, 5m, 10m, 15m, 30m, 1h, 6h, 12h, 24h); server default 24h
+        #[arg(long, default_value = "24h")]
+        interval: String,
+        /// Maximum number of data points (max 1000, server default 10)
+        #[arg(long, default_value = "10")]
+        limit: usize,
+    },
+
     /// Get pools containing a token
     #[command(
         name = "token-pools",
@@ -515,7 +545,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
     // Keyless unless a key is configured: --api-key, then DEXPAPRIKA_API_KEY,
     // then ~/.dexpaprika/config.json. No key keeps the previous behaviour.
     let api_key = config::resolve_api_key(cli.api_key.as_deref());
-    let client = client::ApiClient::with_api_key(api_key);
+    let base_url = config::resolve_base_url(cli.base_url.as_deref());
+    let client = client::ApiClient::with_api_key(api_key, base_url.clone());
     let output = cli.output;
     let raw = cli.raw;
 
@@ -678,6 +709,27 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
             network,
             token_address,
         } => commands::tokens::execute_token(&client, &network, &token_address, output, raw).await,
+        Commands::TokenOhlcv {
+            network,
+            token_address,
+            start,
+            end,
+            interval,
+            limit,
+        } => {
+            commands::tokens::execute_token_ohlcv(
+                &client,
+                &network,
+                &token_address,
+                &start,
+                end.as_deref(),
+                &interval,
+                limit,
+                output,
+                raw,
+            )
+            .await
+        }
         Commands::TokenPools {
             network,
             token_address,
@@ -799,8 +851,10 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
         }
         Commands::Onboard => commands::onboard::execute(),
         Commands::Config { command } => match command {
-            ConfigCommands::Show => commands::config_cmd::show(cli.api_key.as_deref()).await,
-            ConfigCommands::SetKey { key } => commands::config_cmd::set_key(&key).await,
+            ConfigCommands::Show => {
+                commands::config_cmd::show(cli.api_key.as_deref(), base_url).await
+            }
+            ConfigCommands::SetKey { key } => commands::config_cmd::set_key(&key, base_url).await,
             ConfigCommands::Delete => commands::config_cmd::delete(),
         },
     }
@@ -925,6 +979,80 @@ mod tests {
                 assert_eq!(interval, "1h");
             }
             _ => panic!("expected the pool-ohlcv subcommand"),
+        }
+    }
+
+    #[test]
+    fn token_ohlcv_takes_a_relative_start_as_a_separate_argument() {
+        // Same clap quirk as pool-ohlcv: a bare "-24h" reads as a flag unless
+        // told otherwise.
+        let cli = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "token-ohlcv",
+            "ethereum",
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "--start",
+            "-24h",
+            "--end",
+            "-1h",
+            "--interval",
+            "1h",
+        ])
+        .expect("--start -24h must parse");
+
+        match cli.command {
+            Commands::TokenOhlcv {
+                start,
+                end,
+                interval,
+                ..
+            } => {
+                assert_eq!(start, "-24h");
+                assert_eq!(end.as_deref(), Some("-1h"));
+                assert_eq!(interval, "1h");
+            }
+            _ => panic!("expected the token-ohlcv subcommand"),
+        }
+    }
+
+    #[test]
+    fn token_ohlcv_has_no_inversed_flag() {
+        // Unlike pool-ohlcv, a token has no second leg to invert against.
+        let parsed = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "token-ohlcv",
+            "ethereum",
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "--start",
+            "-24h",
+            "--inversed",
+        ]);
+        assert!(
+            parsed.is_err(),
+            "--inversed must be rejected on token-ohlcv"
+        );
+    }
+
+    #[test]
+    fn token_ohlcv_defaults_match_the_server() {
+        let cli = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "token-ohlcv",
+            "ethereum",
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "--start",
+            "-24h",
+        ])
+        .expect("token-ohlcv with only --start must parse");
+
+        match cli.command {
+            Commands::TokenOhlcv {
+                interval, limit, ..
+            } => {
+                assert_eq!(interval, "24h");
+                assert_eq!(limit, 10);
+            }
+            _ => panic!("expected the token-ohlcv subcommand"),
         }
     }
 

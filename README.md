@@ -42,6 +42,11 @@ dexpaprika-cli config delete                 # forget it and go back to keyless
 Or set `DEXPAPRIKA_API_KEY`, or pass `--api-key` on any command. Precedence is
 flag, then environment, then the stored config, then keyless.
 
+**Dev, Pro and Enterprise keys use `https://api-pro.dexpaprika.com`.** Set
+`DEXPAPRIKA_API_BASE_URL=https://api-pro.dexpaprika.com`, or pass `--base-url`
+on any command. The CLI never picks the host from the key; `config show` prints
+the host in use and says so when a paid key is pointed at the free one.
+
 **Paste the key on its own. There is no `Bearer` prefix**, and no other scheme
 word: the API compares the raw header against your key, so `ApiKey` or `Token`
 in front of it returns 401.
@@ -69,6 +74,7 @@ directory.
 | `transactions` | Recent pool transactions | `dexpaprika-cli transactions ethereum 0x88e6...` |
 | `pool-ohlcv` | Pool OHLCV data | `dexpaprika-cli pool-ohlcv ethereum 0x88e6... --start -24h --interval 1h` |
 | `token` | Token details | `dexpaprika-cli token ethereum 0xc02a...` |
+| `token-ohlcv` | Token OHLCV data (Dev or Pro plan) | `dexpaprika-cli token-ohlcv ethereum 0xc02a... --start -24h --interval 1h` |
 | `token-pools` | Pools containing a token | `dexpaprika-cli token-pools ethereum 0xc02a...` |
 | `prices` | Batch token prices | `dexpaprika-cli prices ethereum --tokens 0xc02a...,0xdac1...` |
 | `search` | Search everything | `dexpaprika-cli search uniswap` |
@@ -126,6 +132,12 @@ dexpaprika-cli pool-ohlcv ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --
 ```
 
 How far back you can go and how fine the candles can be depends on your plan. Without a key: the last 24 hours at `1h`, `6h`, `12h` and `24h`. A [free key](https://console.dexpaprika.com) opens 7 days at `10m` and longer; Dev 30 days at every interval; Pro unlimited. A request outside your plan is answered with `403` and a message naming the plan that lifts the limit. Full table: [OHLCV limits by plan](https://docs.dexpaprika.com/knowledge-base/rate-limits#ohlcv-limits-by-plan). The default `--interval` is `24h`, so ask for `1h` when you want more than one candle a day.
+
+`token-ohlcv` returns the same candle shape, but priced in USD for the token itself: a volume-weighted price across every pool it trades in on that network, with volume the USD traded across all of them. It needs a Dev, Pro or Enterprise plan; keyless and a free key get `403` naming the plan that unlocks it, and Dev history covers the last 30 days. Point the CLI at `https://api-pro.dexpaprika.com` first (see [Optional API key](#optional-api-key)). There is no `--inversed` on this command, since a token has no second leg to invert against. [Docs: get OHLCV data for a token](https://docs.dexpaprika.com/api-reference/tokens/get-ohlcv-data-for-a-token).
+
+```bash
+dexpaprika-cli token-ohlcv ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --start -24h --interval 1h --limit 24
+```
 
 ## Time filters
 
