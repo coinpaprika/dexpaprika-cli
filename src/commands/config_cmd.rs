@@ -9,13 +9,14 @@ use crate::client::ApiClient;
 use crate::config;
 
 /// Show which key is in use, where it came from, and what the API makes of it.
-pub async fn show(cli_key: Option<&str>) -> Result<()> {
+pub async fn show(cli_key: Option<&str>, base_url: String) -> Result<()> {
     let key = config::resolve_api_key(cli_key);
     println!("Source:      {}", config::key_source(cli_key));
     match &key {
         Some(k) => println!("Key:         {}", config::mask_key(k)),
         None => println!("Key:         none, running keyless"),
     }
+    println!("Host:        {base_url}");
     println!("Config file: {}", config::config_path()?.display());
     println!();
 
@@ -23,7 +24,7 @@ pub async fn show(cli_key: Option<&str>) -> Result<()> {
     // endpoints an unreadable key is ignored rather than rejected: the call
     // returns 200 with real data while quietly serving the keyless tier, so a
     // broken key looks exactly like a working one.
-    let client = ApiClient::with_api_key(key.clone());
+    let client = ApiClient::with_api_key(key.clone(), base_url);
     match client
         .dexpaprika_get::<serde_json::Value>("/usage", &[])
         .await
@@ -34,6 +35,10 @@ pub async fn show(cli_key: Option<&str>) -> Result<()> {
                 .and_then(|p| p.as_str())
                 .unwrap_or("unknown");
             println!("API reports: plan \"{plan}\"");
+            if let Some(hint) = paid_host_hint(plan, client.base_url()) {
+                println!();
+                println!("{hint}");
+            }
             if key.is_some() && plan == "keyless" {
                 println!();
                 println!("A key is configured but the API still sees an anonymous caller,");
@@ -54,13 +59,13 @@ pub async fn show(cli_key: Option<&str>) -> Result<()> {
 }
 
 /// Validate a key against /usage, then store it with 0600 permissions.
-pub async fn set_key(key: &str) -> Result<()> {
+pub async fn set_key(key: &str, base_url: String) -> Result<()> {
     let Some(clean) = config::sanitize_key(key) else {
         bail!("That does not look like a usable key: it is empty or contains a newline.");
     };
 
     println!("Validating...");
-    let client = ApiClient::with_api_key(Some(clean.clone()));
+    let client = ApiClient::with_api_key(Some(clean.clone()), base_url);
     match client
         .dexpaprika_get::<serde_json::Value>("/usage", &[])
         .await
@@ -78,6 +83,9 @@ pub async fn set_key(key: &str) -> Result<()> {
             }
             config::save_api_key(&clean)?;
             println!("Key validated. The API reports plan \"{plan}\".");
+            if let Some(hint) = paid_host_hint(plan, client.base_url()) {
+                println!("{hint}");
+            }
         }
         Err(err) => {
             // Refuse rather than save. Saving a rejected key means every later
@@ -111,4 +119,41 @@ pub fn delete() -> Result<()> {
         config::API_KEY_ENV_VAR
     );
     Ok(())
+}
+
+/// Paid plans have their own host. Say which one to use when a paid key is
+/// pointed at the free host.
+fn paid_host_hint(plan: &str, base_url: &str) -> Option<String> {
+    let paid = matches!(plan, "dev" | "pro" | "enterprise");
+    (paid && base_url != config::PAID_BASE_URL).then(|| {
+        format!(
+            "A {plan} key belongs on {}. Set {}={} or pass --base-url {}.",
+            config::PAID_BASE_URL,
+            config::BASE_URL_ENV_VAR,
+            config::PAID_BASE_URL,
+            config::PAID_BASE_URL,
+        )
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::paid_host_hint;
+    use crate::config::{DEFAULT_BASE_URL, PAID_BASE_URL};
+
+    #[test]
+    fn paid_key_on_the_free_host_is_told_where_to_go() {
+        for plan in ["dev", "pro", "enterprise"] {
+            let hint = paid_host_hint(plan, DEFAULT_BASE_URL).expect(plan);
+            assert!(hint.contains(PAID_BASE_URL), "{hint}");
+            assert!(hint.contains("DEXPAPRIKA_API_BASE_URL"), "{hint}");
+        }
+    }
+
+    #[test]
+    fn no_hint_on_the_paid_host_or_for_free_plans() {
+        assert!(paid_host_hint("pro", PAID_BASE_URL).is_none());
+        assert!(paid_host_hint("free", DEFAULT_BASE_URL).is_none());
+        assert!(paid_host_hint("keyless", DEFAULT_BASE_URL).is_none());
+    }
 }

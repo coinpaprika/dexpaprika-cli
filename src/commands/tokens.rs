@@ -223,6 +223,68 @@ pub async fn execute_token_pools(
     Ok(())
 }
 
+/// USD candles for a token: a volume-weighted price across every pool it
+/// trades in on that network, with volume the USD traded across all of them.
+/// Same record shape as pool OHLCV, so this reuses `PoolOhlcv` and
+/// `print_pool_ohlcv_table` rather than duplicating both. Unlike pool OHLCV,
+/// there is no `--inversed`: a token has no second leg to invert against.
+///
+/// Dev, Pro and Enterprise plans only. Keyless and free keys get 403, which
+/// `dexpaprika_get` turns into a message naming the plan (see `plan_gate_hint`
+/// in client.rs).
+pub async fn execute_token_ohlcv(
+    client: &ApiClient,
+    network: &str,
+    token_address: &str,
+    start: &str,
+    end: Option<&str>,
+    interval: &str,
+    limit: usize,
+    output: OutputFormat,
+    raw: bool,
+) -> Result<()> {
+    if !super::pools::is_api_time(start) {
+        anyhow::bail!(
+            "Invalid --start format: \"{start}\". Use a relative offset (-24h, -7d, -90m), yyyy-mm-dd, unix timestamp, or RFC3339."
+        );
+    }
+    if let Some(e) = end.filter(|e| !super::pools::is_api_time(e)) {
+        anyhow::bail!(
+            "Invalid --end format: \"{e}\". Use a relative offset (-1h), yyyy-mm-dd, unix timestamp, or RFC3339."
+        );
+    }
+
+    let limit_str = limit.to_string();
+    let mut params: Vec<(&str, &str)> = vec![
+        ("start", start),
+        ("interval", interval),
+        ("limit", &limit_str),
+    ];
+    if let Some(e) = end {
+        params.push(("end", e));
+    }
+
+    let data: Vec<super::pools::PoolOhlcv> = client
+        .dexpaprika_get(
+            &format!("/networks/{network}/tokens/{token_address}/ohlcv"),
+            &params,
+        )
+        .await?;
+    match output {
+        OutputFormat::Table => crate::output::pools::print_pool_ohlcv_table(&data),
+        OutputFormat::Json => {
+            crate::output::print_json_wrapped(
+                &data,
+                crate::output::ResponseMeta::dexpaprika(&format!(
+                    "/token/{network}/{token_address}/ohlcv"
+                )),
+                raw,
+            )?;
+        }
+    }
+    Ok(())
+}
+
 pub async fn execute_prices(
     client: &ApiClient,
     network: &str,
@@ -388,5 +450,31 @@ mod tests {
     #[test]
     fn unset_token_bounds_send_nothing() {
         assert!(token_price_change_params(None, None).is_empty());
+    }
+
+    #[test]
+    fn token_ohlcv_shares_the_pool_ohlcv_time_validation() {
+        // token-ohlcv has no dedicated time parser: it reuses is_api_time, the
+        // same function pool-ohlcv relies on. This just pins that the shapes
+        // the endpoint's docs promise (-24h, -7d, RFC3339, yyyy-mm-dd, unix
+        // seconds) still pass through it.
+        for ok in [
+            "-24h",
+            "-7d",
+            "2026-09-29",
+            "2026-09-29T00:00:00Z",
+            "1790000000",
+        ] {
+            assert!(
+                super::super::pools::is_api_time(ok),
+                "{ok} should be accepted"
+            );
+        }
+        for bad in ["", "yesterday", "24h"] {
+            assert!(
+                !super::super::pools::is_api_time(bad),
+                "{bad} should be rejected"
+            );
+        }
     }
 }
