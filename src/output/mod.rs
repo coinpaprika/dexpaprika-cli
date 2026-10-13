@@ -143,6 +143,7 @@ macro_rules! detail_field {
 // module declared below this point already sees detail_field!. The re-export
 // and the matching `use crate::output::{detail_field}` lines in four submodules
 // were redundant, and clippy on a current toolchain fails the build over them.
+pub mod indicators;
 pub mod networks;
 pub mod pools;
 pub mod search;

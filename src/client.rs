@@ -84,11 +84,26 @@ impl ApiClient {
                 bail!("{hint}");
             }
 
-            // Same idea, for a different gate: token OHLCV refuses keyless and
-            // free-key callers with 403 and this exact message. Keyed on the
-            // message text rather than the request path, the same way
-            // deprecation_hint keys on "replacement", so any endpoint that
-            // starts answering this way is covered without a per-endpoint switch.
+            // The technical-indicator endpoints refuse a plan gap with
+            // `"error":"plan_required"` plus a `required_tier`. Checked live on
+            // 2026-10-13: token OHLCV's 403 now carries that same envelope too
+            // (`{"error":"plan_required","message":"this endpoint requires a Dev
+            // or Pro plan","required_tier":"dev", ...}`), so this check runs
+            // ahead of `plan_gate_hint` and is what actually fires for both
+            // endpoints today. Keyed on the `error` field, the same pattern
+            // `stream_refusal` uses for "preview_only", so an unrelated 403
+            // falls through instead of picking up a hint that does not apply.
+            if let Some(hint) = plan_required_hint(status, &body) {
+                bail!("{hint}");
+            }
+
+            // Same idea, for the older shape of the same token-OHLCV gate: a
+            // bare `{"message":"this endpoint requires a Dev or Pro plan"}` with
+            // no `error` field, which `plan_required_hint` above does not match.
+            // Kept as a fallback in case that shape reappears; live traffic hits
+            // the envelope check above instead. Keyed on the message text rather
+            // than the request path, the same way deprecation_hint keys on
+            // "replacement".
             if let Some(hint) = plan_gate_hint(status, &body) {
                 bail!("{hint}");
             }
@@ -162,6 +177,38 @@ fn plan_gate_hint(status: StatusCode, body: &str) -> Option<String> {
          DEXPAPRIKA_API_BASE_URL=https://api-pro.dexpaprika.com. Manage keys at \
          https://console.dexpaprika.com."
     ))
+}
+
+/// Turn a `plan_required` refusal into a message naming the plan it needs.
+///
+/// The pool and token technical-indicator endpoints answer a plan gap with
+/// `403` and an envelope carrying `"error":"plan_required"` and a
+/// `required_tier`, rather than the fixed message `plan_gate_hint` matches on.
+/// Token indicators are the gated case today (keyless and free keys see this;
+/// pool indicators are open on every plan), but this is written generically so
+/// any endpoint answering with the same envelope is covered without a
+/// per-endpoint switch.
+fn plan_required_hint(status: StatusCode, body: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(body).ok()?;
+    if value.get("error")?.as_str()? != "plan_required" {
+        return None;
+    }
+    let message = value
+        .get("message")
+        .and_then(|m| m.as_str())
+        .unwrap_or("this endpoint needs a higher plan");
+    let required_tier = value.get("required_tier").and_then(|t| t.as_str());
+
+    let mut hint = match required_tier {
+        Some(tier) => format!("{message} ({status}). Needs at least the {tier} plan."),
+        None => format!("{message} ({status})."),
+    };
+    hint.push_str(
+        " See current plans at https://dexpaprika.com/api/pricing. Get or manage a key at \
+         https://console.dexpaprika.com, then run `dexpaprika-cli config set-key <key>` and, \
+         for Dev, Pro or Enterprise, set DEXPAPRIKA_API_BASE_URL=https://api-pro.dexpaprika.com.",
+    );
+    Some(hint)
 }
 
 /// Turn a refused stream connection into a message that says what to do next.
@@ -257,7 +304,11 @@ mod tests {
 
     #[test]
     fn plan_gate_hint_names_the_plan_and_links_pricing_and_console() {
-        // Body as documented for GET /networks/{network}/tokens/{address}/ohlcv.
+        // The bare, pre-envelope shape this function was written for. Live
+        // traffic on GET /networks/{network}/tokens/{address}/ohlcv has since
+        // moved to the plan_required envelope (see the plan_required_hint
+        // tests below), so this function is a fallback kept for that older
+        // shape rather than what fires on the wire today.
         let body = r#"{"message":"this endpoint requires a Dev or Pro plan"}"#;
         let hint = plan_gate_hint(StatusCode::FORBIDDEN, body).expect("expected a hint");
         assert!(hint.contains("this endpoint requires a Dev or Pro plan"));
@@ -279,5 +330,54 @@ mod tests {
     fn plan_gate_hint_none_when_body_not_json() {
         assert!(plan_gate_hint(StatusCode::FORBIDDEN, "plain text error").is_none());
         assert!(plan_gate_hint(StatusCode::FORBIDDEN, "").is_none());
+    }
+
+    #[test]
+    fn plan_required_hint_names_the_tier_and_links_pricing_and_console() {
+        // Envelope captured live from GET
+        // /networks/ethereum/tokens/{address}/indicators on 2026-10-13, keyless.
+        let body = r#"{"error":"plan_required","tier":"keyless","message":"this endpoint requires a Dev or Pro plan","required_tier":"dev","links":{"coupon":"https://dexpaprika.com/api/pricing?coupon=START10","docs":"https://docs.dexpaprika.com/","pricing":"https://dexpaprika.com/api/pricing","register":"https://console.dexpaprika.com"}}"#;
+        let hint = plan_required_hint(StatusCode::FORBIDDEN, body).expect("expected a hint");
+        assert!(hint.contains("this endpoint requires a Dev or Pro plan"));
+        assert!(hint.contains("dev plan"));
+        assert!(hint.contains("https://dexpaprika.com/api/pricing"));
+        assert!(hint.contains("https://console.dexpaprika.com"));
+        assert!(hint.contains("403"));
+        assert!(!hint.contains("Bearer"));
+    }
+
+    #[test]
+    fn plan_required_hint_also_covers_the_token_ohlcv_gate_now() {
+        // Checked live on 2026-10-13: GET
+        // /networks/ethereum/tokens/{address}/ohlcv now answers the same
+        // plan_required envelope, not the bare message plan_gate_hint was
+        // written for. This is the body dexpaprika_get sees for that endpoint
+        // today, and plan_required_hint must match it.
+        let body = r#"{"error":"plan_required","tier":"keyless","message":"this endpoint requires a Dev or Pro plan","required_tier":"dev","links":{"coupon":"https://dexpaprika.com/api/pricing?coupon=START10","docs":"https://docs.dexpaprika.com/","pricing":"https://dexpaprika.com/api/pricing","register":"https://console.dexpaprika.com"}}"#;
+        let hint = plan_required_hint(StatusCode::FORBIDDEN, body).expect("expected a hint");
+        assert!(hint.contains("dev plan"));
+    }
+
+    #[test]
+    fn plan_required_hint_works_without_required_tier() {
+        let body = r#"{"error":"plan_required","message":"needs a higher plan"}"#;
+        let hint = plan_required_hint(StatusCode::FORBIDDEN, body).expect("expected a hint");
+        assert!(hint.contains("needs a higher plan"));
+        assert!(hint.contains("https://dexpaprika.com/api/pricing"));
+    }
+
+    #[test]
+    fn plan_required_hint_none_for_an_unrelated_403() {
+        // A bad key, or the token-ohlcv plan_gate_hint case, must not pick this up.
+        let body = r#"{"message":"this endpoint requires a Dev or Pro plan"}"#;
+        assert!(plan_required_hint(StatusCode::FORBIDDEN, body).is_none());
+        let body = r#"{"error":"invalid_key","message":"invalid API key"}"#;
+        assert!(plan_required_hint(StatusCode::FORBIDDEN, body).is_none());
+    }
+
+    #[test]
+    fn plan_required_hint_none_when_body_not_json() {
+        assert!(plan_required_hint(StatusCode::FORBIDDEN, "plain text error").is_none());
+        assert!(plan_required_hint(StatusCode::FORBIDDEN, "").is_none());
     }
 }
