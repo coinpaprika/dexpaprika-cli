@@ -1,5 +1,6 @@
 pub mod attribution;
 pub mod config_cmd;
+pub mod indicators;
 pub mod networks;
 pub mod onboard;
 pub mod pools;

@@ -72,8 +72,10 @@ directory.
 | `dex-pools` | Pools on a specific DEX | `dexpaprika-cli dex-pools ethereum uniswap_v3 --limit 5` |
 | `transactions` | Recent pool transactions | `dexpaprika-cli transactions ethereum 0x88e6...` |
 | `pool-ohlcv` | Pool OHLCV data | `dexpaprika-cli pool-ohlcv ethereum 0x88e6... --start -24h --interval 1h` |
+| `pool-indicator` | Technical indicator for a pool (rsi, ema, macd, bbands, vwap) | `dexpaprika-cli pool-indicator ethereum 0x88e6... --indicator rsi --interval 1h` |
 | `token` | Token details | `dexpaprika-cli token ethereum 0xc02a...` |
 | `token-ohlcv` | Token OHLCV data (Dev or Pro plan) | `dexpaprika-cli token-ohlcv ethereum 0xc02a... --start -24h --interval 1h` |
+| `token-indicator` | Technical indicator for a token (Dev or Pro plan) | `dexpaprika-cli token-indicator ethereum 0xc02a... --indicator rsi --interval 1h` |
 | `token-pools` | Pools containing a token | `dexpaprika-cli token-pools ethereum 0xc02a...` |
 | `prices` | Batch token prices | `dexpaprika-cli prices ethereum --tokens 0xc02a...,0xdac1...` |
 | `search` | Search everything | `dexpaprika-cli search uniswap` |
@@ -136,6 +138,52 @@ How far back you can go and how fine the candles can be depends on your plan. Wi
 
 ```bash
 dexpaprika-cli token-ohlcv ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --start -24h --interval 1h --limit 24
+```
+
+## Technical indicators
+
+`pool-indicator` and `token-indicator` compute rsi, ema, macd, bbands or vwap over a pool's or
+token's candles. `--indicator` is required; everything else is optional, and the CLI sends only
+the flags you set. There is no default for `--interval` or `--limit` here: a request without them
+gets the server's own default rather than a number this CLI would have to keep in sync.
+
+```bash
+dexpaprika-cli pool-indicator ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --indicator rsi --interval 1h --start -6h
+dexpaprika-cli pool-indicator ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --indicator macd --interval 1h --fast-period 12 --slow-period 26 --signal-period 9
+dexpaprika-cli pool-indicator ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --indicator bbands --interval 1h --period 20 --std-dev 2
+```
+
+Each indicator takes its own parameters, and the API refuses one that belongs to a different
+indicator (`--indicator rsi --fast-period 3` is a `400`), so only pass what the chosen indicator
+accepts:
+
+- `rsi`, `ema`, `vwap`: `--period` (rsi default 14, ema default 20, vwap default 14)
+- `macd`: `--fast-period` (default 12), `--slow-period` (default 26, must be greater than
+  `--fast-period`), `--signal-period` (default 9); no `--period`
+- `bbands`: `--period` (default 20), `--std-dev` (default 2, max 10)
+
+The table shows the timestamp plus the columns the chosen indicator actually returns: a single
+`value` for rsi/ema/vwap, `MACD`/`Signal`/`Histogram` for macd, `Upper`/`Middle`/`Lower` for bbands.
+`--output json` passes the API response straight through.
+
+`--start`, `--end` and `--cursor` work the same way as `pool-ohlcv`'s: an offset back from now
+(`-6h`, `-7d`), a unix timestamp, RFC3339 or `yyyy-mm-dd`, and a `cursor` taken from the previous
+page's `next_cursor`. Do not combine `--cursor` with `--start`; a cursor already encodes where to
+resume.
+
+Pool indicators are available on every plan, with the same interval and history limits as
+`pool-ohlcv` (see [OHLCV history](#ohlcv-history) above). Token indicators need a Dev, Pro or
+Enterprise plan; keyless and a free key get `403` naming the plan, the same way `token-ohlcv`
+does. Point the CLI at `https://api-pro.dexpaprika.com` for a paid key (see
+[Optional API key](#optional-api-key)). Current limits:
+[rate limits](https://docs.dexpaprika.com/knowledge-base/rate-limits) ·
+[pricing](https://dexpaprika.com/api/pricing). Docs:
+[pool indicator](https://docs.dexpaprika.com/api-reference/pools/get-a-technical-indicator-for-a-pool) ·
+[token indicator](https://docs.dexpaprika.com/api-reference/tokens/get-a-technical-indicator-for-a-token) ·
+[tutorial](https://docs.dexpaprika.com/tutorials/technical-indicators).
+
+```bash
+dexpaprika-cli token-indicator ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --indicator rsi --interval 1h --start -6h
 ```
 
 ## Time filters

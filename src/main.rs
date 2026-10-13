@@ -290,6 +290,71 @@ enum Commands {
         inversed: bool,
     },
 
+    /// Get a technical indicator for a pool (rsi, ema, macd, bbands, vwap)
+    #[command(
+        name = "pool-indicator",
+        after_help = "EXAMPLES:\n  \
+        dexpaprika-cli pool-indicator ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --indicator rsi --interval 1h --start -6h\n  \
+        dexpaprika-cli pool-indicator ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --indicator ema --interval 1h --period 50\n  \
+        dexpaprika-cli pool-indicator ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --indicator macd --interval 1h --fast-period 12 --slow-period 26 --signal-period 9\n  \
+        dexpaprika-cli pool-indicator ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 --indicator bbands --interval 1h --period 20 --std-dev 2\n\n\
+        INDICATORS AND THEIR PARAMETERS:\n  \
+        rsi, ema, vwap   --period (rsi default 14, ema default 20, vwap default 14)\n  \
+        macd             --fast-period (default 12), --slow-period (default 26, must be greater than --fast-period), --signal-period (default 9); no --period\n  \
+        bbands           --period (default 20), --std-dev (default 2, max 10)\n\n\
+        Only pass the parameters that belong to the indicator you chose: the API refuses a\n\
+        parameter that belongs to a different one, for example --fast-period with --indicator rsi.\n\
+        This CLI sends only the flags you set, so there is no --interval or --limit default here\n\
+        either; leave them unset to get the server's own default.\n\n\
+        PAGING:\n  \
+        --cursor takes the next_cursor printed under the table. Do not combine it with --start;\n  \
+        a cursor already encodes where to resume.\n\n\
+        PLAN:\n  \
+        All five indicators are available on every plan, with the same interval and history\n  \
+        limits as pool-ohlcv. Current numbers: https://docs.dexpaprika.com/knowledge-base/rate-limits\n  \
+        and https://dexpaprika.com/api/pricing.\n  \
+        https://docs.dexpaprika.com/api-reference/pools/get-a-technical-indicator-for-a-pool"
+    )]
+    PoolIndicator {
+        /// Network ID
+        network: String,
+        /// Pool contract address
+        pool_address: String,
+        /// Indicator: rsi, ema, macd, bbands, vwap
+        #[arg(long)]
+        indicator: String,
+        /// Interval (1m, 5m, 10m, 15m, 30m, 1h, 6h, 12h, 24h, 1d); unset leaves the server's own default
+        #[arg(long)]
+        interval: Option<String>,
+        /// Start: an offset back from now (-24h, -7d, -90m), unix timestamp, RFC3339, or yyyy-mm-dd
+        #[arg(long, allow_hyphen_values = true)]
+        start: Option<String>,
+        /// End (optional), same formats as --start
+        #[arg(long, allow_hyphen_values = true)]
+        end: Option<String>,
+        /// Maximum number of data points (max 1000); unset leaves the server's own default
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Cursor for the next page, taken from the previous response. Do not combine with --start
+        #[arg(long)]
+        cursor: Option<String>,
+        /// Lookback period: rsi, ema, bbands, vwap only. Not accepted by macd
+        #[arg(long)]
+        period: Option<u32>,
+        /// Fast EMA period, macd only
+        #[arg(long)]
+        fast_period: Option<u32>,
+        /// Slow EMA period, macd only. Must be greater than --fast-period
+        #[arg(long)]
+        slow_period: Option<u32>,
+        /// Signal line period, macd only
+        #[arg(long)]
+        signal_period: Option<u32>,
+        /// Standard deviation multiplier, bbands only (max 10)
+        #[arg(long)]
+        std_dev: Option<f64>,
+    },
+
     /// Get detailed info about a token
     #[command(
         after_help = "EXAMPLES:\n  dexpaprika-cli token ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
@@ -323,6 +388,69 @@ enum Commands {
         /// Maximum number of data points (max 1000, server default 10)
         #[arg(long, default_value = "10")]
         limit: usize,
+    },
+
+    /// Get a technical indicator for a token (rsi, ema, macd, bbands, vwap). Needs a Dev or Pro plan
+    #[command(
+        name = "token-indicator",
+        after_help = "EXAMPLES:\n  \
+        dexpaprika-cli token-indicator ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --indicator rsi --interval 1h --start -6h\n  \
+        dexpaprika-cli token-indicator ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --indicator macd --interval 1h\n\n\
+        INDICATORS AND THEIR PARAMETERS:\n  \
+        rsi, ema, vwap   --period (rsi default 14, ema default 20, vwap default 14)\n  \
+        macd             --fast-period (default 12), --slow-period (default 26, must be greater than --fast-period), --signal-period (default 9); no --period\n  \
+        bbands           --period (default 20), --std-dev (default 2, max 10)\n\n\
+        Only pass the parameters that belong to the indicator you chose: the API refuses a\n\
+        parameter that belongs to a different one, for example --fast-period with --indicator rsi.\n\
+        This CLI sends only the flags you set, so there is no --interval or --limit default here\n\
+        either; leave them unset to get the server's own default.\n\n\
+        PAGING:\n  \
+        --cursor takes the next_cursor printed under the table. Do not combine it with --start;\n  \
+        a cursor already encodes where to resume.\n\n\
+        PLAN:\n  \
+        Needs a Dev, Pro or Enterprise plan. Keyless and a free key are answered with 403 naming\n  \
+        the plan. Paid keys use https://api-pro.dexpaprika.com: set DEXPAPRIKA_API_BASE_URL or\n  \
+        pass --base-url.\n  \
+        https://docs.dexpaprika.com/api-reference/tokens/get-a-technical-indicator-for-a-token"
+    )]
+    TokenIndicator {
+        /// Network ID
+        network: String,
+        /// Token contract address
+        token_address: String,
+        /// Indicator: rsi, ema, macd, bbands, vwap
+        #[arg(long)]
+        indicator: String,
+        /// Interval (1m, 5m, 10m, 15m, 30m, 1h, 6h, 12h, 24h, 1d); unset leaves the server's own default
+        #[arg(long)]
+        interval: Option<String>,
+        /// Start: an offset back from now (-24h, -7d, -90m), unix timestamp, RFC3339, or yyyy-mm-dd
+        #[arg(long, allow_hyphen_values = true)]
+        start: Option<String>,
+        /// End (optional), same formats as --start
+        #[arg(long, allow_hyphen_values = true)]
+        end: Option<String>,
+        /// Maximum number of data points (max 1000); unset leaves the server's own default
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Cursor for the next page, taken from the previous response. Do not combine with --start
+        #[arg(long)]
+        cursor: Option<String>,
+        /// Lookback period: rsi, ema, bbands, vwap only. Not accepted by macd
+        #[arg(long)]
+        period: Option<u32>,
+        /// Fast EMA period, macd only
+        #[arg(long)]
+        fast_period: Option<u32>,
+        /// Slow EMA period, macd only. Must be greater than --fast-period
+        #[arg(long)]
+        slow_period: Option<u32>,
+        /// Signal line period, macd only
+        #[arg(long)]
+        signal_period: Option<u32>,
+        /// Standard deviation multiplier, bbands only (max 10)
+        #[arg(long)]
+        std_dev: Option<f64>,
     },
 
     /// Get pools containing a token
@@ -705,6 +833,43 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
             )
             .await
         }
+        Commands::PoolIndicator {
+            network,
+            pool_address,
+            indicator,
+            interval,
+            start,
+            end,
+            limit,
+            cursor,
+            period,
+            fast_period,
+            slow_period,
+            signal_period,
+            std_dev,
+        } => {
+            commands::indicators::execute_pool_indicator(
+                &client,
+                &network,
+                &pool_address,
+                commands::indicators::IndicatorArgs {
+                    indicator,
+                    interval,
+                    start,
+                    end,
+                    limit,
+                    cursor,
+                    period,
+                    fast_period,
+                    slow_period,
+                    signal_period,
+                    std_dev,
+                },
+                output,
+                raw,
+            )
+            .await
+        }
         Commands::Token {
             network,
             token_address,
@@ -725,6 +890,43 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
                 end.as_deref(),
                 &interval,
                 limit,
+                output,
+                raw,
+            )
+            .await
+        }
+        Commands::TokenIndicator {
+            network,
+            token_address,
+            indicator,
+            interval,
+            start,
+            end,
+            limit,
+            cursor,
+            period,
+            fast_period,
+            slow_period,
+            signal_period,
+            std_dev,
+        } => {
+            commands::indicators::execute_token_indicator(
+                &client,
+                &network,
+                &token_address,
+                commands::indicators::IndicatorArgs {
+                    indicator,
+                    interval,
+                    start,
+                    end,
+                    limit,
+                    cursor,
+                    period,
+                    fast_period,
+                    slow_period,
+                    signal_period,
+                    std_dev,
+                },
                 output,
                 raw,
             )
@@ -1251,5 +1453,178 @@ mod tests {
             "-0.5",
         ]);
         assert_eq!(bounds.price_change_24h_min, Some(-0.5));
+    }
+
+    #[test]
+    fn pool_indicator_requires_the_indicator_flag() {
+        let parsed = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "pool-indicator",
+            "ethereum",
+            "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+        ]);
+        assert!(
+            parsed.is_err(),
+            "pool-indicator without --indicator must be rejected"
+        );
+    }
+
+    #[test]
+    fn pool_indicator_takes_a_relative_start_as_a_separate_argument() {
+        // Same clap quirk as pool-ohlcv: a bare "-6h" reads as a flag unless
+        // told otherwise.
+        let cli = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "pool-indicator",
+            "ethereum",
+            "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+            "--indicator",
+            "rsi",
+            "--interval",
+            "1h",
+            "--start",
+            "-6h",
+        ])
+        .expect("--start -6h must parse");
+
+        match cli.command {
+            Commands::PoolIndicator {
+                indicator,
+                interval,
+                start,
+                ..
+            } => {
+                assert_eq!(indicator, "rsi");
+                assert_eq!(interval.as_deref(), Some("1h"));
+                assert_eq!(start.as_deref(), Some("-6h"));
+            }
+            _ => panic!("expected the pool-indicator subcommand"),
+        }
+    }
+
+    #[test]
+    fn pool_indicator_leaves_unset_flags_as_none_not_a_default() {
+        // Unlike pool-ohlcv, indicators sends only the flags the caller set:
+        // --interval and --limit have server-side defaults this CLI does not
+        // own, so they must come back None here, not a hard-coded value.
+        let cli = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "pool-indicator",
+            "ethereum",
+            "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+            "--indicator",
+            "macd",
+        ])
+        .expect("pool-indicator with only --indicator must parse");
+
+        match cli.command {
+            Commands::PoolIndicator {
+                interval,
+                limit,
+                period,
+                fast_period,
+                slow_period,
+                signal_period,
+                std_dev,
+                cursor,
+                start,
+                end,
+                ..
+            } => {
+                assert_eq!(interval, None);
+                assert_eq!(limit, None);
+                assert_eq!(period, None);
+                assert_eq!(fast_period, None);
+                assert_eq!(slow_period, None);
+                assert_eq!(signal_period, None);
+                assert_eq!(std_dev, None);
+                assert_eq!(cursor, None);
+                assert_eq!(start, None);
+                assert_eq!(end, None);
+            }
+            _ => panic!("expected the pool-indicator subcommand"),
+        }
+    }
+
+    #[test]
+    fn pool_indicator_takes_macd_periods_and_std_dev() {
+        let cli = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "pool-indicator",
+            "ethereum",
+            "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+            "--indicator",
+            "macd",
+            "--fast-period",
+            "12",
+            "--slow-period",
+            "26",
+            "--signal-period",
+            "9",
+        ])
+        .expect("macd periods must parse");
+
+        match cli.command {
+            Commands::PoolIndicator {
+                fast_period,
+                slow_period,
+                signal_period,
+                ..
+            } => {
+                assert_eq!(fast_period, Some(12));
+                assert_eq!(slow_period, Some(26));
+                assert_eq!(signal_period, Some(9));
+            }
+            _ => panic!("expected the pool-indicator subcommand"),
+        }
+    }
+
+    #[test]
+    fn token_indicator_requires_the_indicator_flag() {
+        let parsed = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "token-indicator",
+            "ethereum",
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        ]);
+        assert!(
+            parsed.is_err(),
+            "token-indicator without --indicator must be rejected"
+        );
+    }
+
+    #[test]
+    fn token_indicator_takes_network_and_address_and_bbands_params() {
+        let cli = Cli::try_parse_from([
+            "dexpaprika-cli",
+            "token-indicator",
+            "ethereum",
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+            "--indicator",
+            "bbands",
+            "--period",
+            "20",
+            "--std-dev",
+            "2.5",
+        ])
+        .expect("token-indicator with bbands params must parse");
+
+        match cli.command {
+            Commands::TokenIndicator {
+                network,
+                token_address,
+                indicator,
+                period,
+                std_dev,
+                ..
+            } => {
+                assert_eq!(network, "ethereum");
+                assert_eq!(token_address, "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
+                assert_eq!(indicator, "bbands");
+                assert_eq!(period, Some(20));
+                assert_eq!(std_dev, Some(2.5));
+            }
+            _ => panic!("expected the token-indicator subcommand"),
+        }
     }
 }
