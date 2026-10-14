@@ -26,7 +26,7 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 
 ## Optional API key
 
-**The CLI works without a key and always will.** Nothing above needs one.
+**The CLI works without a key.** Nothing above needs one.
 
 A free key raises both the credit allowance and the per-minute limit: keyless
 runs at 15 requests a minute and a registered key at 30. Reach for one when you
@@ -104,6 +104,10 @@ dexpaprika-cli dex-pools ethereum uniswap_v3 --limit 5 --cursor eyJjaGFpbiI6ImV0
 
 Results are cursor-paginated, so there is no `--page` flag on this command. The table prints
 `next_cursor` when more results are available; feed it back through `--cursor`.
+
+Paging past the first page needs an API key; a free key pages without limit. Without one, the
+`next_cursor` line above says so. Set one with `dexpaprika-cli config set-key <key>`, the
+`DEXPAPRIKA_API_KEY` environment variable, or `--api-key`.
 
 ## Price change windows
 

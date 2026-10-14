@@ -131,7 +131,11 @@ pub async fn execute_top_tokens(
     match output {
         OutputFormat::Table => {
             crate::output::tokens::print_token_search_table(&resp.results);
-            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
+            crate::output::print_search_more_results_hint(
+                resp.has_next_page,
+                resp.next_cursor.as_deref(),
+                client.has_api_key(),
+            );
         }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
@@ -208,7 +212,11 @@ pub async fn execute_token_pools(
     match output {
         OutputFormat::Table => {
             crate::output::pools::print_pool_search_table(&resp.results);
-            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
+            crate::output::print_search_more_results_hint(
+                resp.has_next_page,
+                resp.next_cursor.as_deref(),
+                client.has_api_key(),
+            );
         }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
@@ -410,7 +418,11 @@ pub async fn execute_filter_tokens(
     match output {
         OutputFormat::Table => {
             crate::output::tokens::print_token_search_table(&resp.results);
-            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
+            crate::output::print_search_more_results_hint(
+                resp.has_next_page,
+                resp.next_cursor.as_deref(),
+                client.has_api_key(),
+            );
         }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
