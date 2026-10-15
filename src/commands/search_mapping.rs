@@ -13,8 +13,9 @@ const DEFAULT_SORT_FIELD: &str = "volume_usd_24h";
 /// Map a pool sort field (legacy or canonical) to the canonical value accepted
 /// by `/networks/{network}/pools/search`.
 ///
-/// The 6h, 1h and 5m price-change windows are pools-only. tokens/search rejects
-/// them with 400, so they must never be copied into `map_token_sort_field`.
+/// The 6h, 1h, 5m and 48h price-change windows are pools-only. tokens/search
+/// rejects them with 400, so they must never be copied into
+/// `map_token_sort_field`.
 pub fn map_pool_sort_field(field: &str) -> &'static str {
     match field {
         // Canonical values pass through unchanged.
@@ -29,6 +30,7 @@ pub fn map_pool_sort_field(field: &str) -> &'static str {
         "price_change_percentage_6h" => "price_change_percentage_6h",
         "price_change_percentage_1h" => "price_change_percentage_1h",
         "price_change_percentage_5m" => "price_change_percentage_5m",
+        "price_change_percentage_48h" => "price_change_percentage_48h",
         // Legacy aliases.
         "volume_usd" => "volume_usd_24h",
         "volume_24h" => "volume_usd_24h",
@@ -44,8 +46,8 @@ pub fn map_pool_sort_field(field: &str) -> &'static str {
 /// Map a token sort field (legacy or canonical) to the canonical value accepted
 /// by `/networks/{network}/tokens/search`. Note that tokens/search rejects price
 /// ordering, so "price_usd" falls back to the volume default. It also rejects the
-/// 6h, 1h and 5m price-change windows, which pools/search accepts: token rows do
-/// not carry those fields, so those values stay out of this list on purpose.
+/// 6h, 1h, 5m and 48h price-change windows, which pools/search accepts: token rows
+/// do not carry those fields, so those values stay out of this list on purpose.
 pub fn map_token_sort_field(field: &str) -> &'static str {
     match field {
         // Canonical values pass through unchanged.
@@ -102,6 +104,7 @@ mod tests {
             "price_change_percentage_6h",
             "price_change_percentage_1h",
             "price_change_percentage_5m",
+            "price_change_percentage_48h",
         ] {
             assert_eq!(map_pool_sort_field(v), v);
         }
@@ -111,6 +114,17 @@ mod tests {
     fn pool_unknown_value_falls_back_to_default() {
         assert_eq!(map_pool_sort_field("nonsense"), "volume_usd_24h");
         assert_eq!(map_pool_sort_field(""), "volume_usd_24h");
+    }
+
+    #[test]
+    fn pool_48h_sort_is_not_silently_remapped_to_volume() {
+        // Before this field was added to the allowlist, an unrecognised sort
+        // field fell back to DEFAULT_SORT_FIELD, so asking for a 48h sort
+        // actually sent a 24h-volume sort and nobody saw an error.
+        assert_eq!(
+            map_pool_sort_field("price_change_percentage_48h"),
+            "price_change_percentage_48h"
+        );
     }
 
     #[test]
@@ -149,13 +163,14 @@ mod tests {
 
     #[test]
     fn token_short_price_windows_fall_back_to_volume() {
-        // pools/search takes these three, tokens/search answers 400 for them and
+        // pools/search takes these four, tokens/search answers 400 for them and
         // token rows carry no such field. The fallback is what keeps the token
         // commands working, so do not "fix" this by adding them to the token map.
         for v in [
             "price_change_percentage_6h",
             "price_change_percentage_1h",
             "price_change_percentage_5m",
+            "price_change_percentage_48h",
         ] {
             assert_eq!(map_token_sort_field(v), "volume_usd_24h");
             assert_eq!(map_pool_sort_field(v), v);
