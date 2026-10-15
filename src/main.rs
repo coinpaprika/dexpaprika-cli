@@ -105,7 +105,7 @@ enum Commands {
 
     /// List top pools on a network
     #[command(
-        after_help = "EXAMPLES:\n  dexpaprika-cli pools ethereum --limit 5\n  dexpaprika-cli pools solana --order-by volume_usd_24h --sort desc\n  dexpaprika-cli --output json pools ethereum --order-by price_change_percentage_5m --sort desc\n\nThe table shows the 24h change. Sort by the 5m, 1h or 6h window and the values\nyou sorted on are in --output json, so that example asks for JSON."
+        after_help = "EXAMPLES:\n  dexpaprika-cli pools ethereum --limit 5\n  dexpaprika-cli pools solana --order-by volume_usd_24h --sort desc\n  dexpaprika-cli --output json pools ethereum --order-by price_change_percentage_5m --sort desc\n\nThe table shows the 24h change. Sort by the 5m, 1h, 6h or 48h window and the values\nyou sorted on are in --output json, so that example asks for JSON."
     )]
     Pools {
         /// Network ID (e.g., ethereum, solana)
@@ -117,7 +117,7 @@ enum Commands {
         #[arg(long, default_value = "1")]
         page: usize,
         /// Order by field: volume_usd_24h, volume_usd_7d, volume_usd_30d, liquidity_usd,
-        /// txns_24h, created_at, price_usd, price_change_percentage_{24h,6h,1h,5m}
+        /// txns_24h, created_at, price_usd, price_change_percentage_{24h,48h,6h,1h,5m}
         #[arg(long, default_value = "volume_usd_24h")]
         order_by: String,
         /// Sort order
@@ -128,7 +128,7 @@ enum Commands {
     /// Filter pools by volume, liquidity, transactions, price change, and creation date
     #[command(
         name = "pool-filter",
-        after_help = "EXAMPLES:\n  dexpaprika-cli pool-filter ethereum --volume-24h-min 100000\n  dexpaprika-cli pool-filter solana --liquidity-usd-min 50000 --sort-by liquidity\n  dexpaprika-cli pool-filter ethereum --price-change-1h-min 50 --sort-by price_change_percentage_1h\n  dexpaprika-cli pool-filter ethereum --price-change-24h-max -20\n  dexpaprika-cli pool-filter solana --created-after -24h --sort-by created_at\n\nPRICE CHANGE BOUNDS:\n  Percentages, and negative values are the point: --price-change-24h-max -20 means\n  down 20% or more over 24h. Write -0.5 rather than -.5, which clap reads as a flag.\n  The 6h, 1h and 5m windows exist for pools only.\n  The table shows the 24h change; all four windows come back in --output json."
+        after_help = "EXAMPLES:\n  dexpaprika-cli pool-filter ethereum --volume-24h-min 100000\n  dexpaprika-cli pool-filter solana --liquidity-usd-min 50000 --sort-by liquidity\n  dexpaprika-cli pool-filter ethereum --price-change-1h-min 50 --sort-by price_change_percentage_1h\n  dexpaprika-cli pool-filter ethereum --price-change-24h-max -20\n  dexpaprika-cli pool-filter ethereum --price-change-48h-min 100 --sort-by price_change_percentage_48h\n  dexpaprika-cli pool-filter solana --created-after -24h --sort-by created_at\n\nPRICE CHANGE BOUNDS:\n  Percentages, and negative values are the point: --price-change-24h-max -20 means\n  down 20% or more over 24h. Write -0.5 rather than -.5, which clap reads as a flag.\n  The 48h, 6h, 1h and 5m windows exist for pools only.\n  The table shows the 24h change; all five windows come back in --output json."
     )]
     PoolFilter {
         /// Network ID (e.g., ethereum, solana)
@@ -160,6 +160,12 @@ enum Commands {
         /// Maximum 24h price change, in percent (negative allowed)
         #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
         price_change_24h_max: Option<f64>,
+        /// Minimum 48h price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
+        price_change_48h_min: Option<f64>,
+        /// Maximum 48h price change, in percent (negative allowed)
+        #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
+        price_change_48h_max: Option<f64>,
         /// Minimum 6h price change, in percent (negative allowed)
         #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
         price_change_6h_min: Option<f64>,
@@ -185,8 +191,8 @@ enum Commands {
         #[arg(long, allow_hyphen_values = true)]
         created_before: Option<String>,
         /// Sort by field: volume_24h, volume_7d, volume_30d, liquidity, txns_24h, created_at,
-        /// price_usd, price_change_percentage_24h, price_change_percentage_6h,
-        /// price_change_percentage_1h, price_change_percentage_5m
+        /// price_usd, price_change_percentage_24h, price_change_percentage_48h,
+        /// price_change_percentage_6h, price_change_percentage_1h, price_change_percentage_5m
         #[arg(long, default_value = "volume_24h")]
         sort_by: String,
         /// Sort direction: asc or desc
@@ -709,6 +715,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
             txns_24h_min,
             price_change_24h_min,
             price_change_24h_max,
+            price_change_48h_min,
+            price_change_48h_max,
             price_change_6h_min,
             price_change_6h_max,
             price_change_1h_min,
@@ -735,6 +743,8 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
                 PriceChangeBounds {
                     price_change_24h_min,
                     price_change_24h_max,
+                    price_change_48h_min,
+                    price_change_48h_max,
                     price_change_6h_min,
                     price_change_6h_max,
                     price_change_1h_min,
@@ -1296,6 +1306,8 @@ mod tests {
             Commands::PoolFilter {
                 price_change_24h_min,
                 price_change_24h_max,
+                price_change_48h_min,
+                price_change_48h_max,
                 price_change_6h_min,
                 price_change_6h_max,
                 price_change_1h_min,
@@ -1306,6 +1318,8 @@ mod tests {
             } => PriceChangeBounds {
                 price_change_24h_min,
                 price_change_24h_max,
+                price_change_48h_min,
+                price_change_48h_max,
                 price_change_6h_min,
                 price_change_6h_max,
                 price_change_1h_min,
@@ -1355,7 +1369,7 @@ mod tests {
 
     #[test]
     fn pool_filter_price_change_flags_land_in_their_own_field() {
-        // Eight bounds of the same type sit next to each other, so give each a
+        // Ten bounds of the same type sit next to each other, so give each a
         // distinct value: a transposed pair shows up here rather than as a
         // quietly wrong query.
         let bounds = parse_bounds(&[
@@ -1366,6 +1380,10 @@ mod tests {
             "1",
             "--price-change-24h-max",
             "2",
+            "--price-change-48h-min",
+            "9",
+            "--price-change-48h-max",
+            "10",
             "--price-change-6h-min",
             "3",
             "--price-change-6h-max",
@@ -1381,6 +1399,8 @@ mod tests {
         ]);
         assert_eq!(bounds.price_change_24h_min, Some(1.0));
         assert_eq!(bounds.price_change_24h_max, Some(2.0));
+        assert_eq!(bounds.price_change_48h_min, Some(9.0));
+        assert_eq!(bounds.price_change_48h_max, Some(10.0));
         assert_eq!(bounds.price_change_6h_min, Some(3.0));
         assert_eq!(bounds.price_change_6h_max, Some(4.0));
         assert_eq!(bounds.price_change_1h_min, Some(5.0));
@@ -1393,17 +1413,19 @@ mod tests {
     fn pool_filter_price_change_bounds_default_to_none() {
         let bounds = parse_bounds(&["dexpaprika-cli", "pool-filter", "ethereum"]);
         assert_eq!(bounds.price_change_24h_min, None);
+        assert_eq!(bounds.price_change_48h_min, None);
         assert_eq!(bounds.price_change_5m_max, None);
     }
 
     #[test]
     fn filter_tokens_has_no_short_price_change_window_flags() {
-        // tokens/search 400s on the 6h, 1h and 5m sort fields and silently
+        // tokens/search 400s on the 48h, 6h, 1h and 5m sort fields and silently
         // ignores their filter bounds, so the token command stays out of them.
         // The 24h pair is a different case: tokens/search does honour it, and
         // giving filter-tokens those two flags is a change for another PR, not
         // something ruled out by the API.
         for flag in [
+            "--price-change-48h-min",
             "--price-change-6h-min",
             "--price-change-1h-min",
             "--price-change-5m-max",

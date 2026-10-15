@@ -128,25 +128,29 @@ pub struct PoolSearchItem {
     pub price_change_percentage_1h: Option<f64>,
     pub price_change_percentage_6h: Option<f64>,
     pub price_change_percentage_24h: Option<f64>,
+    pub price_change_percentage_48h: Option<f64>,
     pub tokens: Option<Vec<PoolToken>>,
 }
 
-/// The four price-change windows that `/networks/{network}/pools/search` accepts
+/// The five price-change windows that `/networks/{network}/pools/search` accepts
 /// as bounds, carried together so the CLI flags cannot get transposed on the way
 /// through. Values are percentages and negatives are ordinary input: a max of
 /// -20 means "down 20% or more".
 ///
-/// Only the three short windows are pools-only. tokens/search takes the 24h
-/// bounds as well, and silently ignores the 6h, 1h and 5m ones. Checked on
+/// Only the four short windows are pools-only. tokens/search takes the 24h
+/// bounds as well, and silently ignores the 6h, 1h, 5m and 48h ones. Checked on
 /// 2026-08-07 against an unfiltered baseline, because an unknown bound comes
 /// back as HTTP 200 with a full result set: on ethereum tokens/search,
 /// `price_change_percentage_24h_min=20` returned 36.6, 33.2, 1251.0 where the
 /// baseline had -0.07, 0.24, -0.01, while `price_change_percentage_6h_min=20`
-/// returned the baseline unchanged.
+/// returned the baseline unchanged. The 48h window shipped later (2026-10-02)
+/// and was verified live the same way on 2026-10-15.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PriceChangeBounds {
     pub price_change_24h_min: Option<f64>,
     pub price_change_24h_max: Option<f64>,
+    pub price_change_48h_min: Option<f64>,
+    pub price_change_48h_max: Option<f64>,
     pub price_change_6h_min: Option<f64>,
     pub price_change_6h_max: Option<f64>,
     pub price_change_1h_min: Option<f64>,
@@ -157,7 +161,7 @@ pub struct PriceChangeBounds {
 
 /// Pair each set bound with the query parameter name the API expects.
 ///
-/// This lives outside `execute_pool_filter` so the eight names can be pinned by
+/// This lives outside `execute_pool_filter` so the ten names can be pinned by
 /// a test. Nothing at runtime can catch a typo in them: pools/search answers 200
 /// and hands back a full unfiltered set for a parameter it does not recognise,
 /// so `price_change_percentage_1hr_min` looks exactly like a working query. The
@@ -175,6 +179,14 @@ pub fn price_change_params(bounds: &PriceChangeBounds) -> Vec<(&'static str, Str
         (
             "price_change_percentage_24h_max",
             bounds.price_change_24h_max,
+        ),
+        (
+            "price_change_percentage_48h_min",
+            bounds.price_change_48h_min,
+        ),
+        (
+            "price_change_percentage_48h_max",
+            bounds.price_change_48h_max,
         ),
         ("price_change_percentage_6h_min", bounds.price_change_6h_min),
         ("price_change_percentage_6h_max", bounds.price_change_6h_max),
@@ -670,6 +682,8 @@ mod tests {
         PriceChangeBounds {
             price_change_24h_min: Some(1.0),
             price_change_24h_max: Some(2.0),
+            price_change_48h_min: Some(9.0),
+            price_change_48h_max: Some(10.0),
             price_change_6h_min: Some(3.0),
             price_change_6h_max: Some(4.0),
             price_change_1h_min: Some(5.0),
@@ -688,6 +702,8 @@ mod tests {
             vec![
                 ("price_change_percentage_24h_min", "1"),
                 ("price_change_percentage_24h_max", "2"),
+                ("price_change_percentage_48h_min", "9"),
+                ("price_change_percentage_48h_max", "10"),
                 ("price_change_percentage_6h_min", "3"),
                 ("price_change_percentage_6h_max", "4"),
                 ("price_change_percentage_1h_min", "5"),
@@ -698,10 +714,11 @@ mod tests {
         );
     }
 
-    /// The same eight names one layer further out, read off the URL reqwest
-    /// would actually send. Verified against api.dexpaprika.com on 2026-08-07:
-    /// each of these bounds changes the result set, and a misspelling of any of
-    /// them returns the unfiltered baseline at HTTP 200.
+    /// The same ten names one layer further out, read off the URL reqwest
+    /// would actually send. Verified against api.dexpaprika.com on 2026-08-07
+    /// (the 6h, 1h, 24h and 5m bounds) and again on 2026-10-15 (48h): each of
+    /// these bounds changes the result set, and a misspelling of any of them
+    /// returns the unfiltered baseline at HTTP 200.
     #[test]
     fn price_change_bounds_reach_the_query_string() {
         let params = price_change_params(&all_bounds());
@@ -715,6 +732,7 @@ mod tests {
         assert_eq!(
             request.url().query().expect("a query string"),
             "price_change_percentage_24h_min=1&price_change_percentage_24h_max=2\
+             &price_change_percentage_48h_min=9&price_change_percentage_48h_max=10\
              &price_change_percentage_6h_min=3&price_change_percentage_6h_max=4\
              &price_change_percentage_1h_min=5&price_change_percentage_1h_max=6\
              &price_change_percentage_5m_min=7&price_change_percentage_5m_max=8"

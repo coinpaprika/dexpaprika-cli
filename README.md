@@ -107,11 +107,14 @@ Results are cursor-paginated, so there is no `--page` flag on this command. The 
 
 ## Price change windows
 
-`pool-filter` bounds four price-change windows, and both `pools` and `pool-filter` can sort by any of them. Values are percentages, so a max of -20 reads as "down 20% or more":
+`pool-filter` bounds five price-change windows, and both `pools` and `pool-filter` can sort by any of them. Values are percentages, so a max of -20 reads as "down 20% or more":
 
 ```bash
 # Pools down 20% or more over 24h
 dexpaprika-cli pool-filter ethereum --price-change-24h-max -20 --limit 5
+
+# Pools up 100% or more over 48h, sorted by that same window
+dexpaprika-cli pool-filter ethereum --price-change-48h-min 100 --sort-by price_change_percentage_48h
 
 # Pools up 50% or more in the last hour, sorted by that same hour
 dexpaprika-cli pool-filter ethereum --price-change-1h-min 50 --sort-by price_change_percentage_1h
@@ -120,9 +123,9 @@ dexpaprika-cli pool-filter ethereum --price-change-1h-min 50 --sort-by price_cha
 dexpaprika-cli --output json pools ethereum --order-by price_change_percentage_5m --sort desc
 ```
 
-The eight bounds are `--price-change-{24h,6h,1h,5m}-{min,max}`. Tables carry the 24h change, so ask for `--output json` when you want the 6h, 1h and 5m numbers back.
+The ten bounds are `--price-change-{24h,48h,6h,1h,5m}-{min,max}`. Tables carry the 24h change, so ask for `--output json` when you want the 48h, 6h, 1h and 5m numbers back.
 
-Only the 6h, 1h and 5m windows are pools-only. The token endpoint rejects those three as sort fields and quietly ignores them as bounds, which is the nastier half: an ignored bound comes back `200` with the unfiltered page. The 24h window works on both sides, so `top-tokens` sorts by it and `filter-tokens` takes `--price-change-24h-min` and `--price-change-24h-max`.
+Only the 48h, 6h, 1h and 5m windows are pools-only. The token endpoint rejects those four as sort fields and quietly ignores them as bounds, which is the nastier half: an ignored bound comes back `200` with the unfiltered page. The 24h window works on both sides, so `top-tokens` sorts by it and `filter-tokens` takes `--price-change-24h-min` and `--price-change-24h-max`.
 
 ## OHLCV history
 

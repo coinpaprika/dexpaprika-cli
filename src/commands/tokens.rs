@@ -327,9 +327,9 @@ pub async fn execute_prices(
 /// error anywhere. A unit test on the literal strings is the only cheap place
 /// that catches it.
 ///
-/// 24h is the only window tokens carry. The 6h, 1h and 5m bounds that
+/// 24h is the only window tokens carry. The 48h, 6h, 1h and 5m bounds that
 /// `pool-filter` takes are deliberately absent: token rows have no such fields,
-/// and ordering tokens by any of the three is a `400`.
+/// and ordering tokens by any of the four is a `400`.
 fn token_price_change_params(min: Option<f64>, max: Option<f64>) -> Vec<(&'static str, String)> {
     let mut params = Vec::new();
     if let Some(v) = min {
