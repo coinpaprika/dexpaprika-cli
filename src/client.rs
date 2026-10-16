@@ -52,6 +52,14 @@ impl ApiClient {
         &self.dexpaprika_base
     }
 
+    /// Whether a key is configured, from any source (flag, environment, or the
+    /// stored config). Paging past the first page of the four keyless-gated
+    /// search endpoints needs one; everything else works the same with or
+    /// without it.
+    pub fn has_api_key(&self) -> bool {
+        self.api_key.is_some()
+    }
+
     pub async fn dexpaprika_get<T: serde::de::DeserializeOwned>(
         &self,
         path: &str,
@@ -71,6 +79,19 @@ impl ApiClient {
 
         let resp = req.send().await?;
         let status = resp.status();
+
+        // `x-api-warning` is the API telling us something about this specific
+        // response without failing it (today: a keyless request that sent
+        // `cursor` on one of the four search endpoints still gets its page, plus
+        // a warning that paging keyless will soon stop working). To stderr only,
+        // so JSON on stdout stays clean for scripts piping it.
+        if let Some(warning) = resp
+            .headers()
+            .get("x-api-warning")
+            .and_then(|v| v.to_str().ok())
+        {
+            eprintln!("Warning: {warning}");
+        }
 
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
@@ -188,6 +209,16 @@ fn plan_gate_hint(status: StatusCode, body: &str) -> Option<String> {
 /// pool indicators are open on every plan), but this is written generically so
 /// any endpoint answering with the same envelope is covered without a
 /// per-endpoint switch.
+///
+/// The same envelope also carries an optional `param`, naming the query
+/// parameter that triggered the refusal. When `required_tier` is "free" and
+/// `param` is "cursor", the refusal is the four search endpoints
+/// (`/networks/{network}/pools/search`, `/pools/search`,
+/// `/networks/{network}/tokens/search`, `/tokens/search`) telling a keyless
+/// caller that paging past the first page needs a key. That case gets its own
+/// wording naming paging specifically, since "needs at least the free plan" on
+/// its own reads oddly for something any free key already covers in full; every
+/// other combination falls through to the generic hint below.
 fn plan_required_hint(status: StatusCode, body: &str) -> Option<String> {
     let value: serde_json::Value = serde_json::from_str(body).ok()?;
     if value.get("error")?.as_str()? != "plan_required" {
@@ -198,6 +229,15 @@ fn plan_required_hint(status: StatusCode, body: &str) -> Option<String> {
         .and_then(|m| m.as_str())
         .unwrap_or("this endpoint needs a higher plan");
     let required_tier = value.get("required_tier").and_then(|t| t.as_str());
+    let param = value.get("param").and_then(|p| p.as_str());
+
+    if required_tier == Some("free") && param == Some("cursor") {
+        return Some(format!(
+            "{message} ({status}). Paging past the first page needs an API key; a free key \
+             pages without limit. Get one at https://console.dexpaprika.com, then run \
+             `dexpaprika-cli config set-key <key>`, set DEXPAPRIKA_API_KEY, or pass --api-key."
+        ));
+    }
 
     let mut hint = match required_tier {
         Some(tier) => format!("{message} ({status}). Needs at least the {tier} plan."),
@@ -379,5 +419,63 @@ mod tests {
     fn plan_required_hint_none_when_body_not_json() {
         assert!(plan_required_hint(StatusCode::FORBIDDEN, "plain text error").is_none());
         assert!(plan_required_hint(StatusCode::FORBIDDEN, "").is_none());
+    }
+
+    #[test]
+    fn plan_required_hint_names_the_key_mechanisms_for_keyless_cursor_paging() {
+        // The 403 body the four search endpoints will answer once blocking starts
+        // (pools/search, tokens/search, with and without the {network} prefix)
+        // for a keyless request that sent `cursor`, per the launch spec.
+        let body = r#"{"error":"plan_required","tier":"keyless","required_tier":"free","param":"cursor","message":"Search results beyond the first page require an API key (free key: all pages). Create one in under a minute at https://console.dexpaprika.com","links":{"register":"https://console.dexpaprika.com","pricing":"https://dexpaprika.com/api/pricing","docs":"https://docs.dexpaprika.com/knowledge-base/rate-limits#pagination-rules","coupon":"https://dexpaprika.com/api/pricing?coupon=START10"}}"#;
+        let hint = plan_required_hint(StatusCode::FORBIDDEN, body).expect("expected a hint");
+        assert!(hint.contains("Paging past the first page needs an API key"));
+        assert!(hint.contains("https://console.dexpaprika.com"));
+        assert!(hint.contains("config set-key"));
+        assert!(hint.contains("DEXPAPRIKA_API_KEY"));
+        assert!(hint.contains("--api-key"));
+        assert!(!hint.contains("Bearer"));
+        assert!(!hint.contains('\u{2014}'));
+        assert!(!hint.contains('\u{2013}'));
+    }
+
+    #[test]
+    fn plan_required_hint_cursor_param_without_free_tier_falls_through_to_generic() {
+        // A different endpoint could in principle answer plan_required with
+        // param "cursor" while gating on a higher tier; that is not the paging
+        // case this CLI knows about, so it must not pick up the paging wording.
+        let body = r#"{"error":"plan_required","required_tier":"dev","param":"cursor","message":"needs a higher plan"}"#;
+        let hint = plan_required_hint(StatusCode::FORBIDDEN, body).expect("expected a hint");
+        assert!(!hint.contains("Paging past the first page"));
+        assert!(hint.contains("dev plan"));
+    }
+
+    #[test]
+    fn plan_required_hint_free_tier_without_cursor_param_falls_through_to_generic() {
+        let body = r#"{"error":"plan_required","required_tier":"free","param":"interval","message":"needs a higher plan"}"#;
+        let hint = plan_required_hint(StatusCode::FORBIDDEN, body).expect("expected a hint");
+        assert!(!hint.contains("Paging past the first page"));
+        assert!(hint.contains("free plan"));
+    }
+
+    #[test]
+    fn plan_required_hint_without_a_param_field_still_parses() {
+        // The existing envelope shape (token OHLCV, token indicators) carries no
+        // `param` at all; adding that parse must not break it.
+        let body = r#"{"error":"plan_required","tier":"keyless","message":"this endpoint requires a Dev or Pro plan","required_tier":"dev"}"#;
+        let hint = plan_required_hint(StatusCode::FORBIDDEN, body).expect("expected a hint");
+        assert!(hint.contains("dev plan"));
+        assert!(!hint.contains("Paging past the first page"));
+    }
+
+    #[test]
+    fn has_api_key_reflects_what_the_client_was_built_with() {
+        let keyless = ApiClient::with_api_key(None, "https://api.dexpaprika.com".to_string());
+        assert!(!keyless.has_api_key());
+
+        let keyed = ApiClient::with_api_key(
+            Some("api_abc123".to_string()),
+            "https://api.dexpaprika.com".to_string(),
+        );
+        assert!(keyed.has_api_key());
     }
 }

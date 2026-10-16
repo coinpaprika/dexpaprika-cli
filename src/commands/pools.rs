@@ -268,7 +268,11 @@ pub async fn execute_pool_filter(
     match output {
         OutputFormat::Table => {
             crate::output::pools::print_pool_filter_table(&resp.results);
-            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
+            crate::output::print_search_more_results_hint(
+                resp.has_next_page,
+                resp.next_cursor.as_deref(),
+                client.has_api_key(),
+            );
         }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
@@ -309,7 +313,11 @@ pub async fn execute_pools(
     match output {
         OutputFormat::Table => {
             crate::output::pools::print_pool_search_table(&resp.results);
-            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
+            crate::output::print_search_more_results_hint(
+                resp.has_next_page,
+                resp.next_cursor.as_deref(),
+                client.has_api_key(),
+            );
         }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
@@ -393,7 +401,11 @@ pub async fn execute_dex_pools(
     match output {
         OutputFormat::Table => {
             crate::output::pools::print_pool_search_table(&resp.results);
-            crate::output::print_more_results_hint(resp.has_next_page, resp.next_cursor.as_deref());
+            crate::output::print_search_more_results_hint(
+                resp.has_next_page,
+                resp.next_cursor.as_deref(),
+                client.has_api_key(),
+            );
         }
         OutputFormat::Json => {
             crate::output::print_json_wrapped(

@@ -133,6 +133,27 @@ pub fn print_more_results_hint(has_next_page: Option<bool>, next_cursor: Option<
     }
 }
 
+/// Same as `print_more_results_hint`, for the four search endpoints that now
+/// gate paging on a key (`/networks/{network}/pools/search`, `/pools/search`,
+/// `/networks/{network}/tokens/search`, `/tokens/search`): a keyless caller
+/// would otherwise copy `next_cursor` into another run and only find out about
+/// the gate from the API's own refusal. `has_key` is whether this run had one
+/// configured at all (`ApiClient::has_api_key`); when it does, the hint stays
+/// exactly what `print_more_results_hint` already prints.
+pub fn print_search_more_results_hint(
+    has_next_page: Option<bool>,
+    next_cursor: Option<&str>,
+    has_key: bool,
+) {
+    print_more_results_hint(has_next_page, next_cursor);
+    if has_next_page == Some(true) && !has_key {
+        println!(
+            "  Paging needs an API key (a free key pages without limit). Get one at \
+             https://console.dexpaprika.com, then run `dexpaprika-cli config set-key <key>`."
+        );
+    }
+}
+
 macro_rules! detail_field {
     ($rows:expr, $label:expr, $val:expr) => {
         $rows.push([$label.into(), $val]);
