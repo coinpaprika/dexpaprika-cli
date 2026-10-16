@@ -129,6 +129,19 @@ impl ApiClient {
                 bail!("{hint}");
             }
 
+            // api-pro.dexpaprika.com sits behind a Cloudflare edge that blocks
+            // the request itself when the Authorization header does not carry
+            // the expected key prefix, with Cloudflare's own 403 page (an HTML
+            // body) rather than any DexPaprika JSON envelope. Every hint above
+            // already returned None for a body that does not parse as JSON, so
+            // reaching here with a 403 that still is not JSON means Cloudflare
+            // refused the request before the API saw it. A 403 WITH a JSON
+            // body (plan_required and friends) was handled above and never
+            // reaches this check.
+            if let Some(hint) = cloudflare_block_hint(status, &body) {
+                bail!("{hint}");
+            }
+
             match status {
                 StatusCode::NOT_FOUND => {
                     bail!("Not found. Check the network ID and address. API response: {body}");
@@ -251,12 +264,41 @@ fn plan_required_hint(status: StatusCode, body: &str) -> Option<String> {
     Some(hint)
 }
 
+/// Turn a non-JSON 403 body into a clear message about the key being refused
+/// before the request reached the API.
+///
+/// Returns `None` for anything other than a 403, and `None` when the body
+/// parses as JSON, so a `plan_required` (or any other) JSON 403 body keeps
+/// going through its own handling untouched; this only fires on the case none
+/// of the JSON-keyed hints above could ever match.
+fn cloudflare_block_hint(status: StatusCode, body: &str) -> Option<String> {
+    if status != StatusCode::FORBIDDEN {
+        return None;
+    }
+    if serde_json::from_str::<serde_json::Value>(body).is_ok() {
+        return None;
+    }
+    Some(format!(
+        "The API key was refused before it reached the API ({status}). Check that the whole \
+         key was pasted into the Authorization header with nothing in front of it. Keys are at \
+         https://console.dexpaprika.com."
+    ))
+}
+
 /// Turn a refused stream connection into a message that says what to do next.
 ///
 /// Keyless streaming covers price streams on the showcase tokens only. Any other
 /// token, and the reserves feed, is refused at connect time with 403 and
 /// `"error":"preview_only"`; without this the caller saw a bare status code.
 /// Keys on the `error` field, never on the message text.
+///
+/// streaming-pro.dexpaprika.com sits behind the same Cloudflare edge as
+/// api-pro and blocks a connect attempt the same way, with the same HTML
+/// block page, when the Authorization header does not carry the expected key
+/// prefix. `cloudflare_block_hint` already returns `None` for any body that
+/// parses as JSON, so `preview_only` and any other JSON-bodied refusal above
+/// keeps going through its own handling untouched; this only replaces the
+/// final fallback that used to pass the raw HTML straight through.
 pub fn stream_refusal(status: StatusCode, body: &str) -> String {
     if let Some(hint) = deprecation_hint(status, body) {
         return hint;
@@ -272,6 +314,9 @@ pub fn stream_refusal(status: StatusCode, body: &str) -> String {
              reserves feed. Get one at https://console.dexpaprika.com, then run \
              `dexpaprika-cli config set-key <key>` or pass --api-key."
         );
+    }
+    if let Some(hint) = cloudflare_block_hint(status, body) {
+        return hint;
     }
     format!("Stream refused ({status}): {body}")
 }
@@ -303,6 +348,37 @@ mod tests {
         let msg = stream_refusal(StatusCode::UNAUTHORIZED, "bad key");
         assert!(msg.contains("401"));
         assert!(msg.contains("bad key"));
+    }
+
+    #[test]
+    fn stream_refusal_explains_a_403_html_body() {
+        // Cloudflare's own block page in front of streaming-pro.dexpaprika.com,
+        // same page api-pro returns, for a key sent without the expected prefix.
+        let body = "<html>Sorry, you have been blocked</html>";
+        let msg = stream_refusal(StatusCode::FORBIDDEN, body);
+        assert!(msg.contains("The API key was refused before it reached the API"));
+        assert!(msg.contains("https://console.dexpaprika.com"));
+        assert!(msg.contains("403"));
+        assert!(!msg.contains("Bearer"));
+        assert!(!msg.contains("Sorry, you have been blocked"));
+    }
+
+    #[test]
+    fn stream_refusal_json_403_keeps_its_own_handling_not_the_cloudflare_hint() {
+        // A JSON-bodied 403 that is neither preview_only nor the Cloudflare
+        // page must keep falling through to the existing generic fallback,
+        // not pick up the HTML-only hint.
+        let body = r#"{"error":"something_else","message":"nope"}"#;
+        let msg = stream_refusal(StatusCode::FORBIDDEN, body);
+        assert!(!msg.contains("The API key was refused before it reached the API"));
+        assert!(msg.contains("something_else"));
+    }
+
+    #[test]
+    fn stream_refusal_non_403_status_unaffected_by_the_cloudflare_hint() {
+        let msg = stream_refusal(StatusCode::UNAUTHORIZED, "<html>nope</html>");
+        assert!(!msg.contains("The API key was refused before it reached the API"));
+        assert!(msg.contains("401"));
     }
 
     #[test]
@@ -465,6 +541,34 @@ mod tests {
         let hint = plan_required_hint(StatusCode::FORBIDDEN, body).expect("expected a hint");
         assert!(hint.contains("dev plan"));
         assert!(!hint.contains("Paging past the first page"));
+    }
+
+    #[test]
+    fn cloudflare_block_hint_explains_a_403_html_body() {
+        // Cloudflare's own block page in front of api-pro.dexpaprika.com, seen
+        // live on a key sent without the expected prefix.
+        let body = "<html>Sorry, you have been blocked</html>";
+        let hint = cloudflare_block_hint(StatusCode::FORBIDDEN, body).expect("expected a hint");
+        assert!(hint.contains("The API key was refused before it reached the API"));
+        assert!(hint.contains("https://console.dexpaprika.com"));
+        assert!(hint.contains("403"));
+        assert!(!hint.contains("Bearer"));
+        assert!(!hint.contains("Sorry, you have been blocked"));
+    }
+
+    #[test]
+    fn cloudflare_block_hint_none_for_a_json_403_body() {
+        // plan_required and any other JSON-bodied 403 must keep going through
+        // its own handling; this hint only fires on a body that is not JSON.
+        let body =
+            r#"{"error":"plan_required","required_tier":"dev","message":"needs a higher plan"}"#;
+        assert!(cloudflare_block_hint(StatusCode::FORBIDDEN, body).is_none());
+    }
+
+    #[test]
+    fn cloudflare_block_hint_none_for_a_non_403_status() {
+        assert!(cloudflare_block_hint(StatusCode::UNAUTHORIZED, "<html>nope</html>").is_none());
+        assert!(cloudflare_block_hint(StatusCode::NOT_FOUND, "<html>nope</html>").is_none());
     }
 
     #[test]
