@@ -17,6 +17,12 @@ dexpaprika-cli token ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2
 dexpaprika-cli search uniswap
 ```
 
+The installer checks the archive against the `SHA256SUMS` file published with the
+same release and refuses to install on a mismatch or when the file is missing.
+To verify by hand, download both from the
+[releases page](https://github.com/coinpaprika/dexpaprika-cli/releases) and run
+`sha256sum -c SHA256SUMS --ignore-missing` (`shasum -a 256 -c` on macOS).
+
 ## No setup required
 
 No API key, no registration to start. The free tier is keyless, with data delayed up to 60 seconds, and a free key raises both the monthly quota and the per-minute rate. Paid plans are real-time: Dev is $30/month at 120/minute and Pro is $99/month at 500/minute. Monthly quotas change, so read the current figures from [pricing](https://dexpaprika.com/api/pricing).
