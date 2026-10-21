@@ -22,8 +22,8 @@ pub fn execute() -> Result<()> {
     println!("    Not needed. The CLI works keyless and always will.");
     println!("    A free key raises the monthly credit allowance; it does not");
     println!("    raise the per-minute limit, which is the same on both free tiers.");
-    println!("      dexpaprika-cli config set-key api_YOUR_KEY   # validates, then stores it");
-    println!("      dexpaprika-cli config show                   # what the API makes of it");
+    println!("      dexpaprika-cli config set-key    # prompts for the key, validates, stores it");
+    println!("      dexpaprika-cli config show       # what the API makes of it");
     println!("    Or set DEXPAPRIKA_API_KEY. Send the key on its own, nothing in front of it.");
     println!();
     println!("  Good to know:");

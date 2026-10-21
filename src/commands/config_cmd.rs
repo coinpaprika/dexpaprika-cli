@@ -10,9 +10,16 @@ use crate::config;
 use crate::output::{sanitize_for_terminal, sanitize_line};
 
 /// Show which key is in use, where it came from, and what the API makes of it.
-pub async fn show(cli_key: Option<&str>, base_url: String) -> Result<()> {
-    let key = config::resolve_api_key(cli_key);
-    println!("Source:      {}", config::key_source(cli_key));
+pub async fn show(
+    cli_key: Option<&str>,
+    cli_key_file: Option<&str>,
+    base_url: String,
+) -> Result<()> {
+    let key = config::resolve_api_key(cli_key, cli_key_file)?;
+    println!(
+        "Source:      {}",
+        config::key_source(cli_key, cli_key_file)?
+    );
     match &key {
         Some(k) => println!("Key:         {}", config::mask_key(k)),
         None => println!("Key:         none, running keyless"),
@@ -61,9 +68,27 @@ pub async fn show(cli_key: Option<&str>, base_url: String) -> Result<()> {
     Ok(())
 }
 
+/// Where `config set-key` gets the key when none is passed: a hidden prompt on
+/// a terminal, otherwise the first line of stdin (`set-key < keyfile`, or a
+/// secret piped in by a script).
+fn read_key_interactively() -> Result<String> {
+    use std::io::{BufRead, IsTerminal};
+    if std::io::stdin().is_terminal() {
+        return rpassword::prompt_password("Paste your API key (input hidden): ")
+            .map_err(|e| anyhow::anyhow!("Could not read the key: {e}"));
+    }
+    let mut line = String::new();
+    std::io::stdin().lock().read_line(&mut line)?;
+    Ok(line)
+}
+
 /// Validate a key against /usage, then store it with 0600 permissions.
-pub async fn set_key(key: &str, base_url: String) -> Result<()> {
-    let Some(clean) = config::sanitize_key(key) else {
+pub async fn set_key(key: Option<&str>, base_url: String) -> Result<()> {
+    let key = match key {
+        Some(k) => k.to_string(),
+        None => read_key_interactively()?,
+    };
+    let Some(clean) = config::sanitize_key(&key) else {
         bail!("That does not look like a usable key: it is empty or contains a newline.");
     };
 

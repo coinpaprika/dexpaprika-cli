@@ -15,6 +15,17 @@ use std::path::PathBuf;
 /// Environment variable consulted when no `--api-key` is passed.
 pub const API_KEY_ENV_VAR: &str = "DEXPAPRIKA_API_KEY";
 
+/// Environment variable naming a file that holds the key, for setups that keep
+/// secrets in files (a secrets mount, a 0600 file) rather than in variables.
+pub const API_KEY_FILE_ENV_VAR: &str = "DEXPAPRIKA_API_KEY_FILE";
+
+/// Printed whenever the key arrives as a command-line argument.
+pub const ARGV_KEY_WARNING: &str =
+    "Warning: a key passed as a command-line argument is kept in your \
+     shell history and is visible to other users on this machine in the process list. Run \
+     `dexpaprika-cli config set-key` with no argument to be prompted for it, or use \
+     DEXPAPRIKA_API_KEY or --api-key-file instead.";
+
 /// Environment variable consulted when no `--base-url` is passed.
 pub const BASE_URL_ENV_VAR: &str = "DEXPAPRIKA_API_BASE_URL";
 
@@ -144,50 +155,67 @@ pub fn sanitize_key(key: &str) -> Option<String> {
     Some(trimmed.to_string())
 }
 
-/// Resolve the API key: `--api-key` flag, then the environment, then the config
-/// file, then keyless.
-pub fn resolve_api_key(cli_key: Option<&str>) -> Option<String> {
+/// Read a key from a file: the first non-blank line, trimmed.
+pub fn read_key_file(path: &str) -> Result<String> {
+    let raw = fs::read_to_string(path)
+        .with_context(|| format!("Could not read the API key file {path:?}"))?;
+    let line = raw.lines().map(str::trim).find(|l| !l.is_empty());
+    line.and_then(sanitize_key)
+        .with_context(|| format!("The API key file {path:?} does not contain a key."))
+}
+
+/// Resolve the API key and say where it came from: `--api-key`, then
+/// `--api-key-file`, then DEXPAPRIKA_API_KEY, then DEXPAPRIKA_API_KEY_FILE, then
+/// the config file, then keyless. A key file that was asked for but cannot be
+/// read is an error rather than a silent fall back to keyless.
+pub fn resolve_key(
+    cli_key: Option<&str>,
+    cli_key_file: Option<&str>,
+) -> Result<Option<(String, &'static str)>> {
     if let Some(key) = cli_key.and_then(sanitize_key) {
-        return Some(key);
+        return Ok(Some((key, "CLI flag (--api-key)")));
+    }
+    if let Some(path) = cli_key_file.filter(|p| !p.trim().is_empty()) {
+        return Ok(Some((read_key_file(path)?, "Key file (--api-key-file)")));
     }
     if let Some(key) = std::env::var(API_KEY_ENV_VAR)
         .ok()
         .as_deref()
         .and_then(sanitize_key)
     {
-        return Some(key);
+        return Ok(Some((key, "Environment variable (DEXPAPRIKA_API_KEY)")));
     }
-    load_config()
+    if let Some(path) = std::env::var(API_KEY_FILE_ENV_VAR)
+        .ok()
+        .filter(|p| !p.trim().is_empty())
+    {
+        return Ok(Some((
+            read_key_file(&path)?,
+            "Key file (DEXPAPRIKA_API_KEY_FILE)",
+        )));
+    }
+    Ok(load_config()
         .ok()
         .and_then(|c| c.api_key)
         .as_deref()
         .and_then(sanitize_key)
+        .map(|key| (key, "Config file (~/.dexpaprika/config.json)")))
+}
+
+/// The key in use, from whichever source [`resolve_key`] finds first.
+pub fn resolve_api_key(
+    cli_key: Option<&str>,
+    cli_key_file: Option<&str>,
+) -> Result<Option<String>> {
+    Ok(resolve_key(cli_key, cli_key_file)?.map(|(key, _)| key))
 }
 
 /// Where the key in use came from. The first question worth asking when
 /// somebody reports that their key is not working.
-pub fn key_source(cli_key: Option<&str>) -> &'static str {
-    if cli_key.and_then(sanitize_key).is_some() {
-        return "CLI flag (--api-key)";
-    }
-    if std::env::var(API_KEY_ENV_VAR)
-        .ok()
-        .as_deref()
-        .and_then(sanitize_key)
-        .is_some()
-    {
-        return "Environment variable (DEXPAPRIKA_API_KEY)";
-    }
-    if load_config()
-        .ok()
-        .and_then(|c| c.api_key)
-        .as_deref()
-        .and_then(sanitize_key)
-        .is_some()
-    {
-        return "Config file (~/.dexpaprika/config.json)";
-    }
-    "not set (running keyless)"
+pub fn key_source(cli_key: Option<&str>, cli_key_file: Option<&str>) -> Result<&'static str> {
+    Ok(resolve_key(cli_key, cli_key_file)?
+        .map(|(_, source)| source)
+        .unwrap_or("not set (running keyless)"))
 }
 
 /// Show enough of a key to recognise it, never enough to use it.
@@ -245,6 +273,25 @@ mod tests {
     }
 
     #[test]
+    fn a_key_file_gives_its_first_non_blank_line() {
+        let path = std::env::temp_dir().join(format!("dp-key-{}", std::process::id()));
+        fs::write(&path, "\n  api_from_file  \n# second line\n").unwrap();
+        let p = path.to_str().unwrap();
+        assert_eq!(read_key_file(p).unwrap(), "api_from_file");
+        assert_eq!(
+            resolve_key(None, Some(p)).unwrap(),
+            Some(("api_from_file".to_string(), "Key file (--api-key-file)"))
+        );
+        fs::write(&path, "\n \n").unwrap();
+        assert!(read_key_file(p).is_err());
+        let _ = fs::remove_file(&path);
+        assert!(
+            resolve_key(None, Some(p)).is_err(),
+            "a missing file is an error"
+        );
+    }
+
+    #[test]
     fn masking_shows_enough_to_recognise_never_enough_to_use() {
         let masked = mask_key("api_abcdefghijklmnop");
         assert_eq!(masked, "api_...mnop");
@@ -259,7 +306,9 @@ mod tests {
     #[test]
     fn an_explicit_flag_beats_everything_else() {
         assert_eq!(
-            resolve_api_key(Some("api_from_flag")).as_deref(),
+            resolve_api_key(Some("api_from_flag"), None)
+                .unwrap()
+                .as_deref(),
             Some("api_from_flag")
         );
     }
@@ -268,7 +317,10 @@ mod tests {
     fn a_blank_flag_falls_through_rather_than_forcing_keyless() {
         // An empty --api-key is a mistake, not an instruction to ignore the
         // environment, so resolution continues past it.
-        assert_eq!(key_source(Some("   ")), key_source(None));
+        assert_eq!(
+            key_source(Some("   "), None).unwrap(),
+            key_source(None, None).unwrap()
+        );
     }
 }
 

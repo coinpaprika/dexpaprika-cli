@@ -48,7 +48,7 @@ Watchlist file format:
 
 ### Stream reserves
 
-Needs a free API key from [console.dexpaprika.com](https://console.dexpaprika.com). Pass `--api-key`, set `DEXPAPRIKA_API_KEY`, or store it once with `dexpaprika-cli config set-key`. Without one the stream is refused with `403 preview_only`.
+Needs a free API key from [console.dexpaprika.com](https://console.dexpaprika.com). Store it once with `dexpaprika-cli config set-key` (it prompts, or reads the key from stdin), or set `DEXPAPRIKA_API_KEY` or `DEXPAPRIKA_API_KEY_FILE`. Avoid `--api-key`: a key on the command line shows in the process list. Without one the stream is refused with `403 preview_only`.
 
 ```bash
 # Single pool: fires on every reserve change in that pool

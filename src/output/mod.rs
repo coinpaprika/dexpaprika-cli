@@ -206,7 +206,7 @@ pub fn print_search_more_results_hint(
     if has_next_page == Some(true) && !has_key {
         println!(
             "  Paging needs an API key (a free key pages without limit). Get one at \
-             https://console.dexpaprika.com, then run `dexpaprika-cli config set-key <key>`."
+             https://console.dexpaprika.com, then run `dexpaprika-cli config set-key`."
         );
     }
 }

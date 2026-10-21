@@ -34,13 +34,22 @@ are hitting either ceiling. Current figures:
 [rate limits](https://docs.dexpaprika.com/knowledge-base/rate-limits).
 
 ```bash
-dexpaprika-cli config set-key api_YOUR_KEY   # validates against the API, then stores it
-dexpaprika-cli config show                   # which key is in use and what the API makes of it
-dexpaprika-cli config delete                 # forget it and go back to keyless
+dexpaprika-cli config set-key     # prompts for the key (input hidden), validates it, stores it
+dexpaprika-cli config show        # which key is in use and what the API makes of it
+dexpaprika-cli config delete      # forget it and go back to keyless
 ```
 
-Or set `DEXPAPRIKA_API_KEY`, or pass `--api-key` on any command. Precedence is
-flag, then environment, then the stored config, then keyless.
+`config set-key` reads the key from stdin when it is not run in a terminal, so a
+script can do `dexpaprika-cli config set-key < keyfile`. For a single run, set
+`DEXPAPRIKA_API_KEY`, or point `--api-key-file` or `DEXPAPRIKA_API_KEY_FILE` at a
+file holding the key.
+
+`--api-key <KEY>` and `config set-key <KEY>` still work, but a key on the command
+line stays in your shell history and is visible to every user on the machine in
+the process list, so the CLI prints a warning when it gets one there.
+
+Precedence is `--api-key`, then `--api-key-file`, then `DEXPAPRIKA_API_KEY`, then
+`DEXPAPRIKA_API_KEY_FILE`, then the stored config, then keyless.
 
 **Dev, Pro and Enterprise keys use `https://api-pro.dexpaprika.com`.** Set
 `DEXPAPRIKA_API_BASE_URL=https://api-pro.dexpaprika.com`, or pass `--base-url`
@@ -106,8 +115,8 @@ Results are cursor-paginated, so there is no `--page` flag on this command. The 
 `next_cursor` when more results are available; feed it back through `--cursor`.
 
 Paging past the first page needs an API key; a free key pages without limit. Without one, the
-`next_cursor` line above says so. Set one with `dexpaprika-cli config set-key <key>`, the
-`DEXPAPRIKA_API_KEY` environment variable, or `--api-key`.
+`next_cursor` line above says so. Set one with `dexpaprika-cli config set-key` (it prompts for the
+key) or the `DEXPAPRIKA_API_KEY` environment variable.
 
 ## Price change windows
 
@@ -276,7 +285,7 @@ dexpaprika-cli --output json pool -- ethereum 0x88e6a0c2ddd26feeb64f039a2c41296f
 
 In `dexpaprika-cli shell`, the key and the host are fixed when the shell starts
 (`dexpaprika-cli --base-url https://api-pro.dexpaprika.com shell`). A line that
-carries `--api-key` or `--base-url` is ignored. Whenever a key is about to go to
+carries `--api-key`, `--api-key-file` or `--base-url` is ignored. Whenever a key is about to go to
 a host outside dexpaprika.com, the CLI prints a warning first.
 
 ## Links

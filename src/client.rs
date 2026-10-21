@@ -235,7 +235,7 @@ fn plan_gate_hint(status: StatusCode, body: &str) -> Option<String> {
     Some(format!(
         "{message} ({status}). Token OHLCV needs a Dev or Pro plan; Dev covers the last 30 \
          days of history. Get one at https://dexpaprika.com/api/pricing, then run \
-         `dexpaprika-cli config set-key <key>` and set \
+         `dexpaprika-cli config set-key` (it prompts for the key) and set \
          DEXPAPRIKA_API_BASE_URL=https://api-pro.dexpaprika.com. Manage keys at \
          https://console.dexpaprika.com."
     ))
@@ -276,7 +276,7 @@ fn plan_required_hint(status: StatusCode, body: &str) -> Option<String> {
         return Some(format!(
             "{message} ({status}). Paging past the first page needs an API key; a free key \
              pages without limit. Get one at https://console.dexpaprika.com, then run \
-             `dexpaprika-cli config set-key <key>`, set DEXPAPRIKA_API_KEY, or pass --api-key."
+             `dexpaprika-cli config set-key` (it prompts for the key) or set DEXPAPRIKA_API_KEY."
         ));
     }
 
@@ -286,7 +286,7 @@ fn plan_required_hint(status: StatusCode, body: &str) -> Option<String> {
     };
     hint.push_str(
         " See current plans at https://dexpaprika.com/api/pricing. Get or manage a key at \
-         https://console.dexpaprika.com, then run `dexpaprika-cli config set-key <key>` and, \
+         https://console.dexpaprika.com, then run `dexpaprika-cli config set-key` (it prompts) and, \
          for Dev, Pro or Enterprise, set DEXPAPRIKA_API_BASE_URL=https://api-pro.dexpaprika.com.",
     );
     Some(hint)
@@ -340,7 +340,7 @@ pub fn stream_refusal(status: StatusCode, body: &str) -> String {
             "This stream needs an API key ({status}, preview_only). Keyless streaming covers \
              price streams on the showcase tokens only; a free key opens every token and the \
              reserves feed. Get one at https://console.dexpaprika.com, then run \
-             `dexpaprika-cli config set-key <key>` or pass --api-key."
+             `dexpaprika-cli config set-key` (it prompts for the key) or set DEXPAPRIKA_API_KEY."
         );
     }
     if let Some(hint) = cloudflare_block_hint(status, body) {
@@ -361,6 +361,8 @@ mod tests {
         assert!(msg.contains("console.dexpaprika.com"));
         assert!(msg.contains("config set-key"));
         assert!(msg.contains("403"));
+        assert!(!msg.contains("--api-key"));
+        assert!(!msg.contains("set-key <key>"));
     }
 
     #[test]
@@ -536,7 +538,9 @@ mod tests {
         assert!(hint.contains("https://console.dexpaprika.com"));
         assert!(hint.contains("config set-key"));
         assert!(hint.contains("DEXPAPRIKA_API_KEY"));
-        assert!(hint.contains("--api-key"));
+        // Never steer anyone toward putting the key on the command line.
+        assert!(!hint.contains("--api-key"));
+        assert!(!hint.contains("set-key <key>"));
         assert!(!hint.contains("Bearer"));
         assert!(!hint.contains('\u{2014}'));
         assert!(!hint.contains('\u{2013}'));

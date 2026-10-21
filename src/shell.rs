@@ -7,6 +7,7 @@ use rustyline::DefaultEditor;
 /// (`dexpaprika-cli --base-url ... shell`) and every line runs with them.
 pub struct Session {
     pub api_key: Option<String>,
+    pub api_key_file: Option<String>,
     pub base_url: Option<String>,
 }
 
@@ -23,11 +24,11 @@ fn prepare_line(line: &str, session: &Session) -> Result<crate::Cli, String> {
     let mut full_args = vec!["dexpaprika-cli".to_string()];
     full_args.extend(split_args(line));
     let mut cli = crate::Cli::try_parse_from(&full_args).map_err(|e| e.to_string())?;
-    if cli.api_key.is_some() || cli.base_url.is_some() {
+    if cli.api_key.is_some() || cli.api_key_file.is_some() || cli.base_url.is_some() {
         return Err(
-            "--api-key and --base-url are set when the shell starts, for example \
-             `dexpaprika-cli --base-url https://api-pro.dexpaprika.com shell`, not per line. \
-             Line ignored.\n"
+            "--api-key, --api-key-file and --base-url are set when the shell starts, for \
+             example `dexpaprika-cli --base-url https://api-pro.dexpaprika.com shell`, not per \
+             line. Line ignored.\n"
                 .to_string(),
         );
     }
@@ -35,6 +36,7 @@ fn prepare_line(line: &str, session: &Session) -> Result<crate::Cli, String> {
         return Err("Already in the shell.\n".to_string());
     }
     cli.api_key = session.api_key.clone();
+    cli.api_key_file = session.api_key_file.clone();
     cli.base_url = session.base_url.clone();
     Ok(cli)
 }
@@ -132,6 +134,7 @@ mod tests {
     fn session() -> Session {
         Session {
             api_key: Some("api_session".into()),
+            api_key_file: None,
             base_url: Some("https://api-pro.dexpaprika.com".into()),
         }
     }
@@ -145,6 +148,7 @@ mod tests {
             "pool ethereum '0xabc' \"--base-url=http://127.0.0.1:9\"",
             "pool ethereum 0xabc --api-key api_other",
             "pool ethereum 0xabc --api-key=api_other",
+            "pool ethereum 0xabc --api-key-file /tmp/other",
         ] {
             assert!(
                 prepare_line(line, &session()).is_err(),
