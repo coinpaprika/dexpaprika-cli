@@ -42,6 +42,21 @@ fn pick_base_url(cli_base: Option<&str>, env_base: Option<&str>) -> String {
         .to_string()
 }
 
+/// The host a key would be sent to, when that host is not DexPaprika's.
+///
+/// `--base-url` and DEXPAPRIKA_API_BASE_URL exist for the paid host, and the
+/// key goes wherever they point. When that is somewhere else (a word-split
+/// `--base-url=...` smuggled into a command string, a stale variable), the
+/// caller should hear about it before the key leaves.
+pub fn foreign_key_host(base_url: &str) -> Option<String> {
+    let host = reqwest::Url::parse(base_url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_ascii_lowercase))
+        .unwrap_or_else(|| base_url.to_string());
+    let ours = host == "dexpaprika.com" || host.ends_with(".dexpaprika.com");
+    (!ours).then_some(host)
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Config {
     pub api_key: Option<String>,
@@ -265,6 +280,21 @@ mod base_url_tests {
     fn free_host_unless_told_otherwise() {
         assert_eq!(pick_base_url(None, None), DEFAULT_BASE_URL);
         assert_eq!(pick_base_url(Some("  "), Some("")), DEFAULT_BASE_URL);
+    }
+
+    #[test]
+    fn only_dexpaprika_hosts_count_as_ours() {
+        use super::foreign_key_host;
+        assert_eq!(foreign_key_host(DEFAULT_BASE_URL), None);
+        assert_eq!(foreign_key_host(PAID_BASE_URL), None);
+        assert_eq!(
+            foreign_key_host("https://dexpaprika.com.evil.test").as_deref(),
+            Some("dexpaprika.com.evil.test")
+        );
+        assert_eq!(
+            foreign_key_host("http://127.0.0.1:9").as_deref(),
+            Some("127.0.0.1")
+        );
     }
 
     #[test]

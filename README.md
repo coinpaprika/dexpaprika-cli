@@ -261,6 +261,24 @@ dexpaprika-cli --output json pools ethereum
 dexpaprika-cli --output json --raw pools ethereum
 ```
 
+## Calling it from an agent or a script
+
+Pass the arguments as a list, not as one string run through a shell. When a
+value taken from a web page or a token's metadata is pasted into a command
+string, the shell splits it into words, and a word like `--base-url=...` is read
+as a flag. Where a command string cannot be avoided, put `--` after the command
+name: everything after it is data, so a smuggled flag becomes an extra argument
+and the command is refused.
+
+```bash
+dexpaprika-cli --output json pool -- ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640
+```
+
+In `dexpaprika-cli shell`, the key and the host are fixed when the shell starts
+(`dexpaprika-cli --base-url https://api-pro.dexpaprika.com shell`). A line that
+carries `--api-key` or `--base-url` is ignored. Whenever a key is about to go to
+a host outside dexpaprika.com, the CLI prints a warning first.
+
 ## Links
 
 - API docs: https://api.dexpaprika.com

@@ -681,6 +681,13 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
     // then ~/.dexpaprika/config.json. No key keeps the previous behaviour.
     let api_key = config::resolve_api_key(cli.api_key.as_deref());
     let base_url = config::resolve_base_url(cli.base_url.as_deref());
+    if let (Some(_), Some(host)) = (&api_key, config::foreign_key_host(&base_url)) {
+        eprintln!(
+            "Warning: your API key is being sent to {}, which is not a DexPaprika host. \
+             If you did not set --base-url or DEXPAPRIKA_API_BASE_URL to it, stop here.",
+            output::sanitize_line(&host)
+        );
+    }
     let client = client::ApiClient::with_api_key(api_key, base_url.clone());
     let output = cli.output;
     let raw = cli.raw;
@@ -1059,7 +1066,11 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
         Commands::CheckUpdate => commands::version::execute(output, raw).await,
         Commands::Attribution => commands::attribution::execute(output, raw),
         Commands::Shell => {
-            shell::run_shell().await;
+            shell::run_shell(shell::Session {
+                api_key: cli.api_key.clone(),
+                base_url: cli.base_url.clone(),
+            })
+            .await;
             Ok(())
         }
         Commands::Onboard => commands::onboard::execute(),

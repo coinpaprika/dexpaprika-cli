@@ -248,6 +248,7 @@ In-stream errors arrive as `event: error` SSE messages and terminate the stream.
 - Use `BigInt` (or `int`) for raw integer fields when you need arithmetic.
 - Open parallel connections if you need more than 25 subscriptions, up to the 10/IP cap.
 - Validate addresses via REST `/search` before streaming.
+- When driving the CLI, pass arguments as a list rather than a shell string, or put `--` after the command name (`dexpaprika-cli stream -- ethereum 0xc02a...`) so a value from untrusted text can never be read as a flag.
 
 ---
 
