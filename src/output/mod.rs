@@ -94,11 +94,19 @@ pub fn truncate(s: &str, max: usize) -> String {
     truncated
 }
 
+/// Shorten an id to its first six and last four characters.
+///
+/// Counted in characters, not bytes: ids come from the API and the stream, and
+/// slicing bytes would abort the process on a multi-byte character that
+/// straddles the cut.
 pub fn truncate_address(addr: &str) -> String {
-    if addr.len() <= 13 {
+    let len = addr.chars().count();
+    if len <= 13 {
         return addr.to_string();
     }
-    format!("{}...{}", &addr[..6], &addr[addr.len() - 4..])
+    let head: String = addr.chars().take(6).collect();
+    let tail: String = addr.chars().skip(len - 4).collect();
+    format!("{head}...{tail}")
 }
 
 pub fn format_usd(n: f64) -> String {
@@ -280,6 +288,21 @@ mod tests {
         assert!(!table.contains('\u{7}'), "{table:?}");
         assert!(!table.contains('\u{9b}'), "{table:?}");
         assert!(table.contains("Evil"));
+    }
+
+    #[test]
+    fn truncate_address_does_not_split_a_multi_byte_character() {
+        // Byte 6 and the start of the last four bytes both fall inside a
+        // multi-byte character here; byte slicing panicked on this.
+        let id = "0xa\u{e9}\u{e9}abcdefgh\u{e9}a\u{e9}";
+        assert_eq!(truncate_address(id), "0xa\u{e9}\u{e9}a...h\u{e9}a\u{e9}");
+        // A head that is all multi-byte characters: six characters, not six bytes.
+        let wide = "\u{1f600}\u{1f600}\u{1f600}\u{1f600}\u{1f600}\u{1f600}\u{1f600}0123456789";
+        assert_eq!(
+            truncate_address(wide),
+            "\u{1f600}\u{1f600}\u{1f600}\u{1f600}\u{1f600}\u{1f600}...6789"
+        );
+        assert_eq!(truncate_address("\u{e9}\u{e9}"), "\u{e9}\u{e9}");
     }
 
     #[test]
