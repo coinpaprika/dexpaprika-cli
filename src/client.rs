@@ -65,8 +65,8 @@ impl ApiClient {
         path: &str,
         params: &[(&str, &str)],
     ) -> Result<T> {
-        let url = format!("{}{}", self.dexpaprika_base, path);
-        let mut req = self.http.get(&url);
+        let url = request_url(&self.dexpaprika_base, path)?;
+        let mut req = self.http.get(url);
 
         if let Some(key) = &self.api_key {
             // The key alone is the entire Authorization value, nothing in front of it.
@@ -90,7 +90,7 @@ impl ApiClient {
             .get("x-api-warning")
             .and_then(|v| v.to_str().ok())
         {
-            eprintln!("Warning: {warning}");
+            eprintln!("Warning: {}", crate::output::sanitize_line(warning));
         }
 
         if !status.is_success() {
@@ -165,6 +165,34 @@ impl ApiClient {
     }
 }
 
+/// Join the REST host and a path the commands built, and check that the URL
+/// parser kept that path exactly.
+///
+/// Ids are validated and encoded in `ids` before they reach a path, so this is
+/// the last line: if a parser ever resolves a dot segment, decodes something or
+/// splits off a query or fragment, the request is refused instead of going to a
+/// path nobody asked for.
+pub(crate) fn request_url(base: &str, path: &str) -> Result<reqwest::Url> {
+    let base_url = reqwest::Url::parse(base)
+        .map_err(|e| anyhow::anyhow!("Invalid API base URL {base:?}: {e}"))?;
+    let url = reqwest::Url::parse(&format!("{base}{path}"))
+        .map_err(|e| anyhow::anyhow!("Could not build a request URL for {path:?}: {e}"))?;
+    let expected = format!("{}{}", base_url.path().trim_end_matches('/'), path);
+    if url.path() != expected
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || url.host_str() != base_url.host_str()
+        || url.port_or_known_default() != base_url.port_or_known_default()
+    {
+        bail!(
+            "Refusing to send a request whose path changed when parsed: built {expected:?}, \
+             got {:?}.",
+            url.path()
+        );
+    }
+    Ok(url)
+}
+
 /// Build a caller-facing deprecation message from an error response body.
 ///
 /// If the body parses as JSON and carries a "replacement" field, the API is
@@ -207,7 +235,7 @@ fn plan_gate_hint(status: StatusCode, body: &str) -> Option<String> {
     Some(format!(
         "{message} ({status}). Token OHLCV needs a Dev or Pro plan; Dev covers the last 30 \
          days of history. Get one at https://dexpaprika.com/api/pricing, then run \
-         `dexpaprika-cli config set-key <key>` and set \
+         `dexpaprika-cli config set-key` (it prompts for the key) and set \
          DEXPAPRIKA_API_BASE_URL=https://api-pro.dexpaprika.com. Manage keys at \
          https://console.dexpaprika.com."
     ))
@@ -248,7 +276,7 @@ fn plan_required_hint(status: StatusCode, body: &str) -> Option<String> {
         return Some(format!(
             "{message} ({status}). Paging past the first page needs an API key; a free key \
              pages without limit. Get one at https://console.dexpaprika.com, then run \
-             `dexpaprika-cli config set-key <key>`, set DEXPAPRIKA_API_KEY, or pass --api-key."
+             `dexpaprika-cli config set-key` (it prompts for the key) or set DEXPAPRIKA_API_KEY."
         ));
     }
 
@@ -258,7 +286,7 @@ fn plan_required_hint(status: StatusCode, body: &str) -> Option<String> {
     };
     hint.push_str(
         " See current plans at https://dexpaprika.com/api/pricing. Get or manage a key at \
-         https://console.dexpaprika.com, then run `dexpaprika-cli config set-key <key>` and, \
+         https://console.dexpaprika.com, then run `dexpaprika-cli config set-key` (it prompts) and, \
          for Dev, Pro or Enterprise, set DEXPAPRIKA_API_BASE_URL=https://api-pro.dexpaprika.com.",
     );
     Some(hint)
@@ -312,7 +340,7 @@ pub fn stream_refusal(status: StatusCode, body: &str) -> String {
             "This stream needs an API key ({status}, preview_only). Keyless streaming covers \
              price streams on the showcase tokens only; a free key opens every token and the \
              reserves feed. Get one at https://console.dexpaprika.com, then run \
-             `dexpaprika-cli config set-key <key>` or pass --api-key."
+             `dexpaprika-cli config set-key` (it prompts for the key) or set DEXPAPRIKA_API_KEY."
         );
     }
     if let Some(hint) = cloudflare_block_hint(status, body) {
@@ -333,6 +361,8 @@ mod tests {
         assert!(msg.contains("console.dexpaprika.com"));
         assert!(msg.contains("config set-key"));
         assert!(msg.contains("403"));
+        assert!(!msg.contains("--api-key"));
+        assert!(!msg.contains("set-key <key>"));
     }
 
     #[test]
@@ -508,7 +538,9 @@ mod tests {
         assert!(hint.contains("https://console.dexpaprika.com"));
         assert!(hint.contains("config set-key"));
         assert!(hint.contains("DEXPAPRIKA_API_KEY"));
-        assert!(hint.contains("--api-key"));
+        // Never steer anyone toward putting the key on the command line.
+        assert!(!hint.contains("--api-key"));
+        assert!(!hint.contains("set-key <key>"));
         assert!(!hint.contains("Bearer"));
         assert!(!hint.contains('\u{2014}'));
         assert!(!hint.contains('\u{2013}'));
@@ -569,6 +601,32 @@ mod tests {
     fn cloudflare_block_hint_none_for_a_non_403_status() {
         assert!(cloudflare_block_hint(StatusCode::UNAUTHORIZED, "<html>nope</html>").is_none());
         assert!(cloudflare_block_hint(StatusCode::NOT_FOUND, "<html>nope</html>").is_none());
+    }
+
+    #[test]
+    fn request_url_keeps_a_clean_path() {
+        let url = request_url(
+            "https://api.dexpaprika.com",
+            "/networks/ethereum/pools/0xabc",
+        )
+        .unwrap();
+        assert_eq!(url.path(), "/networks/ethereum/pools/0xabc");
+    }
+
+    #[test]
+    fn request_url_refuses_a_path_the_parser_rewrites() {
+        for path in [
+            "/networks/ethereum/pools/../../usage",
+            "/networks/ethereum/pools/%2e%2e/x",
+            "/networks/ethereum/pools/x?y=1",
+            "/networks/ethereum/pools/x#y",
+            "/networks/ethereum/pools/..\\x",
+        ] {
+            assert!(
+                request_url("https://api.dexpaprika.com", path).is_err(),
+                "expected {path:?} to be refused"
+            );
+        }
     }
 
     #[test]

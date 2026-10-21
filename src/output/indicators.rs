@@ -77,7 +77,9 @@ fn print_value_table(data: &[IndicatorPoint]) {
             value: opt(d.value),
         })
         .collect();
-    let table = Table::new(rows).with(Style::rounded()).to_string();
+    let table = crate::output::safe_table(Table::new(rows))
+        .with(Style::rounded())
+        .to_string();
     println!("{table}");
 }
 
@@ -91,7 +93,9 @@ fn print_macd_table(data: &[IndicatorPoint]) {
             histogram: opt(d.histogram),
         })
         .collect();
-    let table = Table::new(rows).with(Style::rounded()).to_string();
+    let table = crate::output::safe_table(Table::new(rows))
+        .with(Style::rounded())
+        .to_string();
     println!("{table}");
 }
 
@@ -105,7 +109,9 @@ fn print_bbands_table(data: &[IndicatorPoint]) {
             lower: opt(d.lower),
         })
         .collect();
-    let table = Table::new(rows).with(Style::rounded()).to_string();
+    let table = crate::output::safe_table(Table::new(rows))
+        .with(Style::rounded())
+        .to_string();
     println!("{table}");
 }
 

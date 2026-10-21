@@ -17,6 +17,12 @@ dexpaprika-cli token ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2
 dexpaprika-cli search uniswap
 ```
 
+The installer checks the archive against the `SHA256SUMS` file published with the
+same release and refuses to install on a mismatch or when the file is missing.
+To verify by hand, download both from the
+[releases page](https://github.com/coinpaprika/dexpaprika-cli/releases) and run
+`sha256sum -c SHA256SUMS --ignore-missing` (`shasum -a 256 -c` on macOS).
+
 ## No setup required
 
 No API key, no registration to start. The free tier is keyless, with data delayed up to 60 seconds, and a free key raises both the monthly quota and the per-minute rate. Paid plans are real-time: Dev is $30/month at 120/minute and Pro is $99/month at 500/minute. Monthly quotas change, so read the current figures from [pricing](https://dexpaprika.com/api/pricing).
@@ -34,13 +40,22 @@ are hitting either ceiling. Current figures:
 [rate limits](https://docs.dexpaprika.com/knowledge-base/rate-limits).
 
 ```bash
-dexpaprika-cli config set-key api_YOUR_KEY   # validates against the API, then stores it
-dexpaprika-cli config show                   # which key is in use and what the API makes of it
-dexpaprika-cli config delete                 # forget it and go back to keyless
+dexpaprika-cli config set-key     # prompts for the key (input hidden), validates it, stores it
+dexpaprika-cli config show        # which key is in use and what the API makes of it
+dexpaprika-cli config delete      # forget it and go back to keyless
 ```
 
-Or set `DEXPAPRIKA_API_KEY`, or pass `--api-key` on any command. Precedence is
-flag, then environment, then the stored config, then keyless.
+`config set-key` reads the key from stdin when it is not run in a terminal, so a
+script can do `dexpaprika-cli config set-key < keyfile`. For a single run, set
+`DEXPAPRIKA_API_KEY`, or point `--api-key-file` or `DEXPAPRIKA_API_KEY_FILE` at a
+file holding the key.
+
+`--api-key <KEY>` and `config set-key <KEY>` still work, but a key on the command
+line stays in your shell history and is visible to every user on the machine in
+the process list, so the CLI prints a warning when it gets one there.
+
+Precedence is `--api-key`, then `--api-key-file`, then `DEXPAPRIKA_API_KEY`, then
+`DEXPAPRIKA_API_KEY_FILE`, then the stored config, then keyless.
 
 **Dev, Pro and Enterprise keys use `https://api-pro.dexpaprika.com`.** Set
 `DEXPAPRIKA_API_BASE_URL=https://api-pro.dexpaprika.com`, or pass `--base-url`
@@ -106,8 +121,8 @@ Results are cursor-paginated, so there is no `--page` flag on this command. The 
 `next_cursor` when more results are available; feed it back through `--cursor`.
 
 Paging past the first page needs an API key; a free key pages without limit. Without one, the
-`next_cursor` line above says so. Set one with `dexpaprika-cli config set-key <key>`, the
-`DEXPAPRIKA_API_KEY` environment variable, or `--api-key`.
+`next_cursor` line above says so. Set one with `dexpaprika-cli config set-key` (it prompts for the
+key) or the `DEXPAPRIKA_API_KEY` environment variable.
 
 ## Price change windows
 
@@ -260,6 +275,24 @@ dexpaprika-cli --output json pools ethereum
 # Raw JSON (no _meta wrapper, for piping)
 dexpaprika-cli --output json --raw pools ethereum
 ```
+
+## Calling it from an agent or a script
+
+Pass the arguments as a list, not as one string run through a shell. When a
+value taken from a web page or a token's metadata is pasted into a command
+string, the shell splits it into words, and a word like `--base-url=...` is read
+as a flag. Where a command string cannot be avoided, put `--` after the command
+name: everything after it is data, so a smuggled flag becomes an extra argument
+and the command is refused.
+
+```bash
+dexpaprika-cli --output json pool -- ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640
+```
+
+In `dexpaprika-cli shell`, the key and the host are fixed when the shell starts
+(`dexpaprika-cli --base-url https://api-pro.dexpaprika.com shell`). A line that
+carries `--api-key`, `--api-key-file` or `--base-url` is ignored. Whenever a key is about to go to
+a host outside dexpaprika.com, the CLI prints a warning first.
 
 ## Links
 

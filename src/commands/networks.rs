@@ -52,6 +52,7 @@ pub async fn execute_dexes(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
     let limit_str = limit.to_string();
     let page_str = page.to_string();
     let resp: DexesResponse = client

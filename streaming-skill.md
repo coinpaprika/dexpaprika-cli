@@ -48,7 +48,7 @@ Watchlist file format:
 
 ### Stream reserves
 
-Needs a free API key from [console.dexpaprika.com](https://console.dexpaprika.com). Pass `--api-key`, set `DEXPAPRIKA_API_KEY`, or store it once with `dexpaprika-cli config set-key`. Without one the stream is refused with `403 preview_only`.
+Needs a free API key from [console.dexpaprika.com](https://console.dexpaprika.com). Store it once with `dexpaprika-cli config set-key` (it prompts, or reads the key from stdin), or set `DEXPAPRIKA_API_KEY` or `DEXPAPRIKA_API_KEY_FILE`. Avoid `--api-key`: a key on the command line shows in the process list. Without one the stream is refused with `403 preview_only`.
 
 ```bash
 # Single pool: fires on every reserve change in that pool
@@ -248,6 +248,7 @@ In-stream errors arrive as `event: error` SSE messages and terminate the stream.
 - Use `BigInt` (or `int`) for raw integer fields when you need arithmetic.
 - Open parallel connections if you need more than 25 subscriptions, up to the 10/IP cap.
 - Validate addresses via REST `/search` before streaming.
+- When driving the CLI, pass arguments as a list rather than a shell string, or put `--` after the command name (`dexpaprika-cli stream -- ethereum 0xc02a...`) so a value from untrusted text can never be read as a flag.
 
 ---
 

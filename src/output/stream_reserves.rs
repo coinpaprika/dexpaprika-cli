@@ -32,7 +32,7 @@ pub fn print_reserve_event(event: &ReserveEvent, output: OutputFormat) {
                 .request_id
                 .map(|r| format!("  req {r}"))
                 .unwrap_or_default();
-            println!(
+            let line = format!(
                 "{}  {}  block {}  {}  pool {}  pair {}  Δ ${:.2}  TVL ${:.2}{}",
                 time,
                 event.method,
@@ -44,6 +44,7 @@ pub fn print_reserve_event(event: &ReserveEvent, output: OutputFormat) {
                 event.total_reserve_usd,
                 rid,
             );
+            println!("{}", crate::output::sanitize_line(&line));
         }
         OutputFormat::Json => {
             if let Ok(json) = serde_json::to_string(event) {

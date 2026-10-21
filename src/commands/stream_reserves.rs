@@ -193,6 +193,33 @@ struct ReserveSubscription {
 
 const MAX_SUBSCRIPTIONS_PER_POST: usize = 25;
 
+const RESERVES_STREAM_URL: &str = "https://streaming.dexpaprika.com/sse/reserves";
+
+/// The single-target reserves stream URL. Network and address are validated
+/// like the REST ids and every value goes through the URL's query builder, so a
+/// stray `&`, `=` or `#` cannot add, repeat or cut off a parameter.
+fn reserves_stream_url(
+    network: &str,
+    address: &str,
+    method: &str,
+    request_id: Option<u32>,
+) -> Result<reqwest::Url> {
+    let network = crate::ids::network(network)?;
+    crate::ids::check_address(address, "address")?;
+    let mut url = reqwest::Url::parse(RESERVES_STREAM_URL)?;
+    {
+        let mut query = url.query_pairs_mut();
+        query
+            .append_pair("method", method)
+            .append_pair("chain", &network)
+            .append_pair("address", address);
+        if let Some(rid) = request_id {
+            query.append_pair("request_id", &rid.to_string());
+        }
+    }
+    Ok(url)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn execute(
     client: &ApiClient,
@@ -243,16 +270,11 @@ async fn stream_single(
     limit: Option<usize>,
     output: OutputFormat,
 ) -> Result<()> {
-    let mut url = format!(
-        "https://streaming.dexpaprika.com/sse/reserves?method={method}&chain={network}&address={address}"
-    );
-    if let Some(rid) = request_id {
-        url.push_str(&format!("&request_id={rid}"));
-    }
+    let url = reserves_stream_url(network, address, method, request_id)?;
 
     // EventSource::get cannot carry headers, so build the request first and let
     // the client attach the key when one is configured.
-    let mut es = EventSource::new(client.authorize(client.http_client().get(&url)))?;
+    let mut es = EventSource::new(client.authorize(client.http_client().get(url)))?;
     let mut count = 0usize;
 
     loop {
@@ -278,7 +300,10 @@ async fn stream_single(
                                 }
                             }
                             None => {
-                                eprintln!("Parse error on {} event", msg.event);
+                                eprintln!(
+                                    "Parse error on {} event",
+                                    crate::output::sanitize_line(&msg.event)
+                                );
                             }
                         }
                     }
@@ -384,7 +409,7 @@ async fn stream_multi(
         .authorize(
             client
                 .http_client()
-                .post("https://streaming.dexpaprika.com/sse/reserves")
+                .post(RESERVES_STREAM_URL)
                 .header("Accept", "text/event-stream")
                 .header("Content-Type", "application/json"),
         )
@@ -466,6 +491,57 @@ fn parse_reserve_message(message: &str) -> Option<ReserveEvent> {
 
 #[cfg(test)]
 mod tests {
+
+    fn reserve_pairs(url: &reqwest::Url) -> Vec<(String, String)> {
+        url.query_pairs()
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect()
+    }
+
+    #[test]
+    fn reserves_url_values_cannot_add_or_repeat_parameters() {
+        let url = reserves_stream_url(
+            "ethereum",
+            "0xReal&method=token_reserves&request_id=7",
+            "pool_reserves",
+            Some(1),
+        )
+        .unwrap();
+        assert_eq!(
+            reserve_pairs(&url),
+            vec![
+                ("method".into(), "pool_reserves".into()),
+                ("chain".into(), "ethereum".into()),
+                (
+                    "address".into(),
+                    "0xReal&method=token_reserves&request_id=7".into()
+                ),
+                ("request_id".into(), "1".into()),
+            ]
+        );
+    }
+
+    #[test]
+    fn reserves_url_refuses_a_hash_or_bad_network() {
+        assert!(reserves_stream_url("ethereum", "0xReal#x", "pool_reserves", None).is_err());
+        assert!(reserves_stream_url("eth&x=1", "0xReal", "pool_reserves", None).is_err());
+    }
+
+    #[test]
+    fn reserves_url_for_a_real_pool_is_unchanged() {
+        let url = reserves_stream_url(
+            "ethereum",
+            "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+            "pool_reserves",
+            Some(3),
+        )
+        .unwrap();
+        assert_eq!(
+            url.as_str(),
+            "https://streaming.dexpaprika.com/sse/reserves?method=pool_reserves&chain=ethereum&address=0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640&request_id=3"
+        );
+    }
+
     use super::*;
 
     // Real `pool_reserves` data payload captured from the live feed.

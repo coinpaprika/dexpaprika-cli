@@ -114,6 +114,7 @@ pub async fn execute_top_tokens(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
     let limit_str = limit.to_string();
     let order_by = crate::commands::search_mapping::map_token_sort_field(order_by);
     // Search is cursor-paginated: drop "page", map the sort field to canonical.
@@ -157,6 +158,8 @@ pub async fn execute_token(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
+    let token_address = crate::ids::address(token_address, "token address")?;
     let token: TokenDetail = client
         .dexpaprika_get(&format!("/networks/{network}/tokens/{token_address}"), &[])
         .await?;
@@ -186,6 +189,8 @@ pub async fn execute_token_pools(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
+    crate::ids::check_address(token_address, "token address")?;
     let limit_str = limit.to_string();
     let order_by = crate::commands::search_mapping::map_pool_sort_field(order_by);
     // The dedicated /networks/{network}/tokens/{address}/pools endpoint was
@@ -251,6 +256,8 @@ pub async fn execute_token_ohlcv(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
+    let token_address = crate::ids::address(token_address, "token address")?;
     if !super::pools::is_api_time(start) {
         anyhow::bail!(
             "Invalid --start format: \"{start}\". Use a relative offset (-24h, -7d, -90m), yyyy-mm-dd, unix timestamp, or RFC3339."
@@ -300,6 +307,7 @@ pub async fn execute_prices(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
     let prices: Vec<TokenPrice> = client
         .dexpaprika_get(
             &format!("/networks/{network}/multi/prices"),
@@ -369,6 +377,7 @@ pub async fn execute_filter_tokens(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
     super::pools::check_time("--created-after", created_after)?;
     super::pools::check_time("--created-before", created_before)?;
     let limit_str = limit.to_string();

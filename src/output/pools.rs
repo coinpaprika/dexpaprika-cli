@@ -78,7 +78,9 @@ pub fn print_pool_filter_table(results: &[PoolSearchItem]) {
         })
         .collect();
 
-    let table = Table::new(rows).with(Style::rounded()).to_string();
+    let table = crate::output::safe_table(Table::new(rows))
+        .with(Style::rounded())
+        .to_string();
     println!("{table}");
     print_dexpaprika_footer();
 }
@@ -128,7 +130,9 @@ pub fn print_pool_search_table(pools: &[PoolSearchItem]) {
         })
         .collect();
 
-    let table = Table::new(rows).with(Style::rounded()).to_string();
+    let table = crate::output::safe_table(Table::new(rows))
+        .with(Style::rounded())
+        .to_string();
     println!("{table}");
     print_dexpaprika_footer();
 }
@@ -306,7 +310,9 @@ pub fn print_transactions_table(txs: &[PoolTransaction]) {
         })
         .collect();
 
-    let table = Table::new(rows).with(Style::rounded()).to_string();
+    let table = crate::output::safe_table(Table::new(rows))
+        .with(Style::rounded())
+        .to_string();
     println!("{table}");
     print_dexpaprika_footer();
 }
@@ -346,7 +352,9 @@ pub fn print_pool_ohlcv_table(data: &[PoolOhlcv]) {
         })
         .collect();
 
-    let table = Table::new(rows).with(Style::rounded()).to_string();
+    let table = crate::output::safe_table(Table::new(rows))
+        .with(Style::rounded())
+        .to_string();
     println!("{table}");
     print_dexpaprika_footer();
 }

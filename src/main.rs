@@ -1,6 +1,7 @@
 mod client;
 mod commands;
 mod config;
+mod ids;
 mod output;
 mod shell;
 
@@ -36,11 +37,20 @@ pub(crate) struct Cli {
     #[arg(long, global = true, default_value = "false")]
     pub(crate) raw: bool,
 
-    /// Optional API key. Beats DEXPAPRIKA_API_KEY and the stored config.
+    /// Optional API key. Beats every other source.
     ///
     /// The CLI works without one; a key raises the monthly credit allowance.
+    /// A key on the command line is kept in shell history and shows in the
+    /// process list, so prefer `config set-key` (it prompts),
+    /// DEXPAPRIKA_API_KEY or --api-key-file.
     #[arg(long, global = true, value_name = "KEY")]
     pub(crate) api_key: Option<String>,
+
+    /// Read the API key from this file (first non-blank line). Beats
+    /// DEXPAPRIKA_API_KEY; DEXPAPRIKA_API_KEY_FILE does the same from the
+    /// environment.
+    #[arg(long, global = true, value_name = "PATH")]
+    pub(crate) api_key_file: Option<String>,
 
     /// REST host. Beats DEXPAPRIKA_API_BASE_URL; defaults to https://api.dexpaprika.com.
     ///
@@ -54,10 +64,13 @@ pub(crate) struct Cli {
 pub(crate) enum ConfigCommands {
     /// Show which key is in use and what the API makes of it
     Show,
-    /// Validate a key against the API, then store it
+    /// Validate a key against the API, then store it. Prompts for the key
+    /// (input hidden) or reads it from stdin when no argument is given
     SetKey {
-        /// The key, exactly as issued, with nothing in front of it.
-        key: String,
+        /// The key, exactly as issued, with nothing in front of it. Better left
+        /// out: an argument is kept in shell history and shows in the process
+        /// list. Without it the key is prompted for, or read from stdin.
+        key: Option<String>,
     },
     /// Forget the stored key
     Delete,
@@ -612,8 +625,8 @@ enum Commands {
         dexpaprika-cli stream-reserves ethereum 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 --method token_reserves --limit 10\n  \
         dexpaprika-cli stream-reserves --subscriptions reserves.json\n\n\
         API KEY:\n  \
-        Needs a free key from https://console.dexpaprika.com. Store it with `dexpaprika-cli config set-key <key>`,\n  \
-        set DEXPAPRIKA_API_KEY, or pass --api-key. Keyless, the stream is refused with 403 preview_only.\n\n\
+        Needs a free key from https://console.dexpaprika.com. Store it with `dexpaprika-cli config set-key`\n  \
+        (it prompts for the key) or set DEXPAPRIKA_API_KEY. Keyless, the stream is refused with 403 preview_only.\n\n\
         METHODS:\n  \
         pool_reserves    Subscribe to one specific pool (fires a 'pool_reserves' event with a nested tokens array when reserves change)\n  \
         token_reserves   Subscribe to one token (fires a 'token_reserves' event per pool containing it; high volume on USDC etc)\n\n\
@@ -678,8 +691,15 @@ pub(crate) fn run(
 async fn run_inner(cli: Cli) -> anyhow::Result<()> {
     // Keyless unless a key is configured: --api-key, then DEXPAPRIKA_API_KEY,
     // then ~/.dexpaprika/config.json. No key keeps the previous behaviour.
-    let api_key = config::resolve_api_key(cli.api_key.as_deref());
+    let api_key = config::resolve_api_key(cli.api_key.as_deref(), cli.api_key_file.as_deref())?;
     let base_url = config::resolve_base_url(cli.base_url.as_deref());
+    if let (Some(_), Some(host)) = (&api_key, config::foreign_key_host(&base_url)) {
+        eprintln!(
+            "Warning: your API key is being sent to {}, which is not a DexPaprika host. \
+             If you did not set --base-url or DEXPAPRIKA_API_BASE_URL to it, stop here.",
+            output::sanitize_line(&host)
+        );
+    }
     let client = client::ApiClient::with_api_key(api_key, base_url.clone());
     let output = cli.output;
     let raw = cli.raw;
@@ -1058,24 +1078,56 @@ async fn run_inner(cli: Cli) -> anyhow::Result<()> {
         Commands::CheckUpdate => commands::version::execute(output, raw).await,
         Commands::Attribution => commands::attribution::execute(output, raw),
         Commands::Shell => {
-            shell::run_shell().await;
+            shell::run_shell(shell::Session {
+                api_key: cli.api_key.clone(),
+                api_key_file: cli.api_key_file.clone(),
+                base_url: cli.base_url.clone(),
+            })
+            .await;
             Ok(())
         }
         Commands::Onboard => commands::onboard::execute(),
         Commands::Config { command } => match command {
             ConfigCommands::Show => {
-                commands::config_cmd::show(cli.api_key.as_deref(), base_url).await
+                commands::config_cmd::show(
+                    cli.api_key.as_deref(),
+                    cli.api_key_file.as_deref(),
+                    base_url,
+                )
+                .await
             }
-            ConfigCommands::SetKey { key } => commands::config_cmd::set_key(&key, base_url).await,
+            ConfigCommands::SetKey { key } => {
+                commands::config_cmd::set_key(key.as_deref(), base_url).await
+            }
             ConfigCommands::Delete => commands::config_cmd::delete(),
         },
     }
+}
+
+/// Whether this command line carries the key itself, which leaves it in shell
+/// history and in the process list.
+fn key_in_argv(cli: &Cli) -> bool {
+    let flag = cli
+        .api_key
+        .as_deref()
+        .and_then(config::sanitize_key)
+        .is_some();
+    let set_key_arg = matches!(
+        &cli.command,
+        Commands::Config {
+            command: ConfigCommands::SetKey { key: Some(_) }
+        }
+    );
+    flag || set_key_arg
 }
 
 #[tokio::main]
 async fn main() -> ExitCode {
     let cli = Cli::parse();
     let output = cli.output;
+    if key_in_argv(&cli) {
+        eprintln!("{}", config::ARGV_KEY_WARNING);
+    }
 
     if let Err(e) = run(cli).await {
         match output {
@@ -1083,7 +1135,9 @@ async fn main() -> ExitCode {
                 println!("{}", serde_json::json!({"error": e.to_string()}));
             }
             OutputFormat::Table => {
-                eprintln!("Error: {e}");
+                // Error text can carry an API response body; keep its bytes
+                // from steering the terminal.
+                eprintln!("Error: {}", output::sanitize_for_terminal(&e.to_string()));
             }
         }
         return ExitCode::FAILURE;
@@ -1094,6 +1148,45 @@ async fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parse(args: &[&str]) -> Cli {
+        match Cli::try_parse_from(args) {
+            Ok(cli) => cli,
+            Err(e) => panic!("{args:?} should parse: {e}"),
+        }
+    }
+
+    #[test]
+    fn a_key_in_argv_is_flagged() {
+        assert!(key_in_argv(&parse(&[
+            "dexpaprika-cli",
+            "--api-key",
+            "api_x",
+            "stats"
+        ])));
+        assert!(key_in_argv(&parse(&[
+            "dexpaprika-cli",
+            "config",
+            "set-key",
+            "api_x"
+        ])));
+    }
+
+    #[test]
+    fn keys_from_a_prompt_file_or_environment_are_not_flagged() {
+        assert!(!key_in_argv(&parse(&[
+            "dexpaprika-cli",
+            "config",
+            "set-key"
+        ])));
+        assert!(!key_in_argv(&parse(&[
+            "dexpaprika-cli",
+            "--api-key-file",
+            "/run/secrets/dexpaprika",
+            "stats"
+        ])));
+        assert!(!key_in_argv(&parse(&["dexpaprika-cli", "stats"])));
+    }
 
     #[test]
     fn transactions_take_relative_from_and_to() {

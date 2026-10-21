@@ -1,6 +1,7 @@
 use crate::commands::search::DexSearchResult;
 use crate::output::{
-    format_percent, format_price, format_usd, print_dexpaprika_footer, truncate_address,
+    format_percent, format_price, format_usd, print_dexpaprika_footer, sanitize_line,
+    truncate_address,
 };
 
 pub fn print_dex_search(result: &DexSearchResult) {
@@ -25,7 +26,7 @@ pub fn print_dex_search(result: &DexSearchResult) {
                 } else {
                     format!("  {extra}")
                 };
-                println!(
+                let line = format!(
                     "  {} ({}) · {} [{}]{suffix}",
                     t.name.as_deref().unwrap_or("-"),
                     t.symbol.as_deref().unwrap_or("-"),
@@ -34,6 +35,7 @@ pub fn print_dex_search(result: &DexSearchResult) {
                         .unwrap_or_else(|| "-".into()),
                     t.chain.as_deref().unwrap_or("-"),
                 );
+                println!("{}", sanitize_line(&line));
             }
             println!();
         }
@@ -59,7 +61,7 @@ pub fn print_dex_search(result: &DexSearchResult) {
                 } else {
                     format!("  {extra}")
                 };
-                println!(
+                let line = format!(
                     "  {} · {} [{}]{suffix}",
                     p.id.as_deref()
                         .map(truncate_address)
@@ -67,6 +69,7 @@ pub fn print_dex_search(result: &DexSearchResult) {
                     p.dex_name.as_deref().unwrap_or("-"),
                     p.chain.as_deref().unwrap_or("-"),
                 );
+                println!("{}", sanitize_line(&line));
             }
             println!();
         }
@@ -76,12 +79,13 @@ pub fn print_dex_search(result: &DexSearchResult) {
         if !dexes.is_empty() {
             println!("DEXes:");
             for d in dexes {
-                println!(
+                let line = format!(
                     "  {} · {} [{}]",
                     d.id.as_deref().unwrap_or("-"),
                     d.name.as_deref().unwrap_or("-"),
                     d.chain.as_deref().unwrap_or("-"),
                 );
+                println!("{}", sanitize_line(&line));
             }
             println!();
         }

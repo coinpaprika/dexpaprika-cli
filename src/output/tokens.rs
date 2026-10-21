@@ -239,7 +239,9 @@ pub fn print_token_search_table(tokens: &[TokenSearchItem]) {
         })
         .collect();
 
-    let table = Table::new(rows).with(Style::rounded()).to_string();
+    let table = crate::output::safe_table(Table::new(rows))
+        .with(Style::rounded())
+        .to_string();
     println!("{table}");
     print_dexpaprika_footer();
 }
@@ -258,7 +260,9 @@ pub fn print_prices_table(prices: &[TokenPrice]) {
         })
         .collect();
 
-    let table = Table::new(rows).with(Style::rounded()).to_string();
+    let table = crate::output::safe_table(Table::new(rows))
+        .with(Style::rounded())
+        .to_string();
     println!("{table}");
     print_dexpaprika_footer();
 }
