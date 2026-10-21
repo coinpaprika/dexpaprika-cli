@@ -121,6 +121,8 @@ pub async fn execute_pool_indicator(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
+    let pool_address = crate::ids::address(pool_address, "pool address")?;
     let params = indicator_params(&args)?;
     let param_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
 
@@ -158,6 +160,8 @@ pub async fn execute_token_indicator(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
+    let token_address = crate::ids::address(token_address, "token address")?;
     let params = indicator_params(&args)?;
     let param_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
 

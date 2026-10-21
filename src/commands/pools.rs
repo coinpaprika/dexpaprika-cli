@@ -220,6 +220,7 @@ pub async fn execute_pool_filter(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
     check_time("--created-after", created_after)?;
     check_time("--created-before", created_before)?;
     let limit_str = limit.to_string();
@@ -297,6 +298,7 @@ pub async fn execute_pools(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
     let limit_str = limit.to_string();
     let order_by = crate::commands::search_mapping::map_pool_sort_field(order_by);
     // Search is cursor-paginated: drop "page", map the sort field to canonical.
@@ -340,6 +342,8 @@ pub async fn execute_pool_detail(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
+    let pool_address = crate::ids::address(pool_address, "pool address")?;
     let mut params: Vec<(&str, &str)> = Vec::new();
     if inversed {
         params.push(("inversed", "true"));
@@ -384,6 +388,7 @@ pub async fn execute_dex_pools(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
     let limit_str = limit.to_string();
     let order_by = crate::commands::search_mapping::map_pool_sort_field(order_by);
     let mut params: Vec<(&str, &str)> = vec![
@@ -431,6 +436,8 @@ pub async fn execute_transactions(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
+    let pool_address = crate::ids::address(pool_address, "pool address")?;
     check_time("--from", from)?;
     check_time("--to", to)?;
     let limit_str = limit.to_string();
@@ -509,6 +516,8 @@ pub async fn execute_ohlcv(
     output: OutputFormat,
     raw: bool,
 ) -> Result<()> {
+    let network = crate::ids::network(network)?;
+    let pool_address = crate::ids::address(pool_address, "pool address")?;
     if !is_api_time(start) {
         anyhow::bail!(
             "Invalid --start format: \"{start}\". Use a relative offset (-24h, -7d, -90m), yyyy-mm-dd, unix timestamp, or RFC3339."

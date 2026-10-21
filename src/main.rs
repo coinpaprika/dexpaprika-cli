@@ -1,6 +1,7 @@
 mod client;
 mod commands;
 mod config;
+mod ids;
 mod output;
 mod shell;
 

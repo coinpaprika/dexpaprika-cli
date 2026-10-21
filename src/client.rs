@@ -65,8 +65,8 @@ impl ApiClient {
         path: &str,
         params: &[(&str, &str)],
     ) -> Result<T> {
-        let url = format!("{}{}", self.dexpaprika_base, path);
-        let mut req = self.http.get(&url);
+        let url = request_url(&self.dexpaprika_base, path)?;
+        let mut req = self.http.get(url);
 
         if let Some(key) = &self.api_key {
             // The key alone is the entire Authorization value, nothing in front of it.
@@ -163,6 +163,34 @@ impl ApiClient {
     pub fn http_client(&self) -> &reqwest::Client {
         &self.http
     }
+}
+
+/// Join the REST host and a path the commands built, and check that the URL
+/// parser kept that path exactly.
+///
+/// Ids are validated and encoded in `ids` before they reach a path, so this is
+/// the last line: if a parser ever resolves a dot segment, decodes something or
+/// splits off a query or fragment, the request is refused instead of going to a
+/// path nobody asked for.
+pub(crate) fn request_url(base: &str, path: &str) -> Result<reqwest::Url> {
+    let base_url = reqwest::Url::parse(base)
+        .map_err(|e| anyhow::anyhow!("Invalid API base URL {base:?}: {e}"))?;
+    let url = reqwest::Url::parse(&format!("{base}{path}"))
+        .map_err(|e| anyhow::anyhow!("Could not build a request URL for {path:?}: {e}"))?;
+    let expected = format!("{}{}", base_url.path().trim_end_matches('/'), path);
+    if url.path() != expected
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || url.host_str() != base_url.host_str()
+        || url.port_or_known_default() != base_url.port_or_known_default()
+    {
+        bail!(
+            "Refusing to send a request whose path changed when parsed: built {expected:?}, \
+             got {:?}.",
+            url.path()
+        );
+    }
+    Ok(url)
 }
 
 /// Build a caller-facing deprecation message from an error response body.
@@ -569,6 +597,32 @@ mod tests {
     fn cloudflare_block_hint_none_for_a_non_403_status() {
         assert!(cloudflare_block_hint(StatusCode::UNAUTHORIZED, "<html>nope</html>").is_none());
         assert!(cloudflare_block_hint(StatusCode::NOT_FOUND, "<html>nope</html>").is_none());
+    }
+
+    #[test]
+    fn request_url_keeps_a_clean_path() {
+        let url = request_url(
+            "https://api.dexpaprika.com",
+            "/networks/ethereum/pools/0xabc",
+        )
+        .unwrap();
+        assert_eq!(url.path(), "/networks/ethereum/pools/0xabc");
+    }
+
+    #[test]
+    fn request_url_refuses_a_path_the_parser_rewrites() {
+        for path in [
+            "/networks/ethereum/pools/../../usage",
+            "/networks/ethereum/pools/%2e%2e/x",
+            "/networks/ethereum/pools/x?y=1",
+            "/networks/ethereum/pools/x#y",
+            "/networks/ethereum/pools/..\\x",
+        ] {
+            assert!(
+                request_url("https://api.dexpaprika.com", path).is_err(),
+                "expected {path:?} to be refused"
+            );
+        }
     }
 
     #[test]
