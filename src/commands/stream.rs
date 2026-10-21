@@ -86,13 +86,11 @@ async fn stream_single(
     limit: Option<usize>,
     output: OutputFormat,
 ) -> Result<()> {
-    let url = format!(
-        "https://streaming.dexpaprika.com/sse/prices?method=token_price&chain={network}&address={address}"
-    );
+    let url = price_stream_url(network, address)?;
 
     // EventSource::get cannot carry headers, so build the request first and let
     // the client attach the key when one is configured.
-    let mut es = EventSource::new(client.authorize(client.http_client().get(&url)))?;
+    let mut es = EventSource::new(client.authorize(client.http_client().get(url)))?;
     let mut count = 0usize;
 
     loop {
@@ -138,6 +136,23 @@ async fn stream_single(
 
     Ok(())
 }
+
+/// The single-token price stream URL. Network and address are validated like
+/// the REST ids and then added through the URL's own query builder, so an `&`,
+/// `=` or `#` in a value stays part of that value instead of adding or cutting
+/// off query parameters.
+fn price_stream_url(network: &str, address: &str) -> Result<reqwest::Url> {
+    let network = crate::ids::network(network)?;
+    crate::ids::check_address(address, "token address")?;
+    let mut url = reqwest::Url::parse(PRICE_STREAM_URL)?;
+    url.query_pairs_mut()
+        .append_pair("method", "token_price")
+        .append_pair("chain", &network)
+        .append_pair("address", address);
+    Ok(url)
+}
+
+const PRICE_STREAM_URL: &str = "https://streaming.dexpaprika.com/sse/prices";
 
 async fn stream_multi(
     client: &ApiClient,
@@ -202,7 +217,7 @@ async fn stream_multi(
         .authorize(
             client
                 .http_client()
-                .post("https://streaming.dexpaprika.com/sse/prices")
+                .post(PRICE_STREAM_URL)
                 .header("Accept", "text/event-stream")
                 .header("Content-Type", "application/json"),
         )
@@ -279,4 +294,46 @@ fn parse_token_price_message(message: &str) -> Option<StreamEvent> {
     serde_json::from_str::<RawStreamEvent>(data)
         .ok()
         .map(StreamEvent::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pairs(url: &reqwest::Url) -> Vec<(String, String)> {
+        url.query_pairs()
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect()
+    }
+
+    #[test]
+    fn an_ampersand_in_the_address_cannot_add_a_parameter() {
+        let url = price_stream_url("ethereum", "0xReal&method=token_reserves").unwrap();
+        assert_eq!(
+            pairs(&url),
+            vec![
+                ("method".into(), "token_price".into()),
+                ("chain".into(), "ethereum".into()),
+                ("address".into(), "0xReal&method=token_reserves".into()),
+            ]
+        );
+        assert!(url.fragment().is_none());
+    }
+
+    #[test]
+    fn a_hash_or_bad_network_is_refused_before_connecting() {
+        assert!(price_stream_url("ethereum", "0xReal#ignored-fragment").is_err());
+        assert!(price_stream_url("ethereum&method=x", "0xReal").is_err());
+        assert!(price_stream_url("ethereum", "../../usage").is_err());
+    }
+
+    #[test]
+    fn a_real_token_streams_as_before() {
+        let url =
+            price_stream_url("ethereum", "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2").unwrap();
+        assert_eq!(
+            url.as_str(),
+            "https://streaming.dexpaprika.com/sse/prices?method=token_price&chain=ethereum&address=0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+        );
+    }
 }
