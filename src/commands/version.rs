@@ -92,18 +92,7 @@ pub async fn execute(output: OutputFormat, raw: bool) -> Result<()> {
     };
 
     match output {
-        OutputFormat::Table => {
-            if check.up_to_date {
-                println!("dexpaprika-cli v{} is up to date.", check.current);
-            } else {
-                println!(
-                    "dexpaprika-cli v{}: update available, v{}\n\n  \
-                     Update:  cargo install dexpaprika-cli\n  \
-                     Release: https://github.com/coinpaprika/dexpaprika-cli/releases/latest",
-                    check.current, check.latest
-                );
-            }
-        }
+        OutputFormat::Table => println!("{}", update_message(&check)),
         OutputFormat::Json => {
             crate::output::print_json_wrapped(
                 &check,
@@ -116,9 +105,38 @@ pub async fn execute(output: OutputFormat, raw: bool) -> Result<()> {
     Ok(())
 }
 
+/// Table-mode text for a version check. The latest tag comes from the GitHub
+/// API, so it is cleaned before it is printed.
+fn update_message(check: &VersionCheck) -> String {
+    if check.up_to_date {
+        format!("dexpaprika-cli v{} is up to date.", check.current)
+    } else {
+        format!(
+            "dexpaprika-cli v{}: update available, v{}\n\n  \
+             Update:  cargo install dexpaprika-cli\n  \
+             Release: https://github.com/coinpaprika/dexpaprika-cli/releases/latest",
+            check.current,
+            crate::output::sanitize_line(&check.latest)
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_hostile_release_tag_is_cleaned_before_printing() {
+        let check = VersionCheck {
+            current: "0.1.0".into(),
+            latest: "9.9.9\u{1b}]0;FAKE\u{7}\u{1b}[2J".into(),
+            up_to_date: false,
+        };
+        let msg = update_message(&check);
+        assert!(!msg.contains('\u{1b}'), "{msg:?}");
+        assert!(!msg.contains('\u{7}'), "{msg:?}");
+        assert!(msg.contains("9.9.9"));
+    }
 
     #[test]
     fn equal_versions_are_up_to_date() {

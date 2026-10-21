@@ -90,7 +90,7 @@ impl ApiClient {
             .get("x-api-warning")
             .and_then(|v| v.to_str().ok())
         {
-            eprintln!("Warning: {warning}");
+            eprintln!("Warning: {}", crate::output::sanitize_line(warning));
         }
 
         if !status.is_success() {

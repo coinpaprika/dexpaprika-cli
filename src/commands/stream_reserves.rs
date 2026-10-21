@@ -278,7 +278,10 @@ async fn stream_single(
                                 }
                             }
                             None => {
-                                eprintln!("Parse error on {} event", msg.event);
+                                eprintln!(
+                                    "Parse error on {} event",
+                                    crate::output::sanitize_line(&msg.event)
+                                );
                             }
                         }
                     }

@@ -7,6 +7,7 @@ use anyhow::{bail, Result};
 
 use crate::client::ApiClient;
 use crate::config;
+use crate::output::{sanitize_for_terminal, sanitize_line};
 
 /// Show which key is in use, where it came from, and what the API makes of it.
 pub async fn show(cli_key: Option<&str>, base_url: String) -> Result<()> {
@@ -16,7 +17,7 @@ pub async fn show(cli_key: Option<&str>, base_url: String) -> Result<()> {
         Some(k) => println!("Key:         {}", config::mask_key(k)),
         None => println!("Key:         none, running keyless"),
     }
-    println!("Host:        {base_url}");
+    println!("Host:        {}", sanitize_line(&base_url));
     println!("Config file: {}", config::config_path()?.display());
     println!();
 
@@ -34,7 +35,7 @@ pub async fn show(cli_key: Option<&str>, base_url: String) -> Result<()> {
                 .get("plan")
                 .and_then(|p| p.as_str())
                 .unwrap_or("unknown");
-            println!("API reports: plan \"{plan}\"");
+            println!("API reports: plan \"{}\"", sanitize_line(plan));
             if let Some(hint) = paid_host_hint(plan, client.base_url()) {
                 println!();
                 println!("{hint}");
@@ -46,7 +47,10 @@ pub async fn show(cli_key: Option<&str>, base_url: String) -> Result<()> {
             }
         }
         Err(err) => {
-            println!("API check failed: {err}");
+            println!(
+                "API check failed: {}",
+                sanitize_for_terminal(&err.to_string())
+            );
             if key.is_some() {
                 println!();
                 println!("The key reached the API and was rejected. Check that the whole key");
@@ -81,7 +85,10 @@ pub async fn set_key(key: &str, base_url: String) -> Result<()> {
                 );
             }
             config::save_api_key(&clean)?;
-            println!("Key validated. The API reports plan \"{plan}\".");
+            println!(
+                "Key validated. The API reports plan \"{}\".",
+                sanitize_line(plan)
+            );
             if let Some(hint) = paid_host_hint(plan, client.base_url()) {
                 println!("{hint}");
             }

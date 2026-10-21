@@ -39,7 +39,9 @@ pub fn print_networks_table(networks: &[Network]) {
         })
         .collect();
 
-    let table = Table::new(rows).with(Style::rounded()).to_string();
+    let table = crate::output::safe_table(Table::new(rows))
+        .with(Style::rounded())
+        .to_string();
     println!("{table}");
     print_dexpaprika_footer();
 }
@@ -82,7 +84,9 @@ pub fn print_dexes_table(dexes: &[Dex]) {
         })
         .collect();
 
-    let table = Table::new(rows).with(Style::rounded()).to_string();
+    let table = crate::output::safe_table(Table::new(rows))
+        .with(Style::rounded())
+        .to_string();
     println!("{table}");
     print_dexpaprika_footer();
 }

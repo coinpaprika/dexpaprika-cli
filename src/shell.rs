@@ -34,11 +34,14 @@ pub async fn run_shell() {
                 match crate::Cli::try_parse_from(&full_args) {
                     Ok(cli) => {
                         if let Err(e) = crate::run(cli).await {
-                            eprintln!("Error: {e}");
+                            eprintln!(
+                                "Error: {}",
+                                crate::output::sanitize_for_terminal(&e.to_string())
+                            );
                         }
                     }
                     Err(e) => {
-                        eprintln!("{e}");
+                        eprint!("{}", crate::output::sanitize_for_terminal(&e.to_string()));
                     }
                 }
             }

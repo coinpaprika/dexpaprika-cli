@@ -1,8 +1,8 @@
 use anyhow::Result;
 use chrono::Utc;
 use serde::Serialize;
-use tabled::settings::object::Columns;
-use tabled::settings::{Modify, Style, Width};
+use tabled::settings::object::{Columns, Segment};
+use tabled::settings::{Format, Modify, Style, Width};
 use tabled::Table;
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -38,6 +38,49 @@ impl ResponseMeta {
             timestamp: Utc::now().to_rfc3339(),
         }
     }
+}
+
+// --- Terminal safety ---
+
+/// Whether a terminal would act on this character instead of showing it: C0
+/// controls (ESC among them), DEL, C1 controls, and the bidi embedding and
+/// isolate controls that can make one string display as another.
+fn is_terminal_control(c: char) -> bool {
+    c.is_control() || matches!(c, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+}
+
+/// Make API, on-chain or otherwise untrusted text safe to print in table mode.
+///
+/// Token names, symbols, links, DEX names and error bodies come from whoever
+/// deployed the contract or answered the request, and printed raw an ESC
+/// sequence in one can clear the screen, retitle the window or, on terminals
+/// that honour OSC 52, write the clipboard. Every control character is
+/// dropped except newline and tab, which stay so multi-line text keeps its
+/// shape. JSON output does not go through here: serde_json escapes it.
+pub fn sanitize_for_terminal(s: &str) -> String {
+    s.chars()
+        .filter(|&c| c == '\n' || c == '\t' || !is_terminal_control(c))
+        .collect()
+}
+
+/// Same as [`sanitize_for_terminal`] for text that must stay on one line, such
+/// as a field in a streamed event: newline, carriage return and tab become a
+/// space, so a value cannot start a fake line of output.
+pub fn sanitize_line(s: &str) -> String {
+    s.chars()
+        .filter_map(|c| match c {
+            '\n' | '\r' | '\t' => Some(' '),
+            c if is_terminal_control(c) => None,
+            c => Some(c),
+        })
+        .collect()
+}
+
+/// Sanitize every cell of a table before it is laid out, so the widths are
+/// measured on what will actually be shown.
+pub fn safe_table(mut table: Table) -> Table {
+    table.modify(Segment::all(), Format::content(sanitize_for_terminal));
+    table
 }
 
 // --- Shared output helpers ---
@@ -107,12 +150,15 @@ pub fn print_json_wrapped<T: Serialize>(data: &T, meta: ResponseMeta, raw: bool)
 }
 
 pub fn print_detail_table(rows: Vec<[String; 2]>) {
-    let table = Table::from_iter(rows)
+    println!("{}", render_detail_table(rows));
+}
+
+fn render_detail_table(rows: Vec<[String; 2]>) -> String {
+    safe_table(Table::from_iter(rows))
         .with(Style::rounded())
         .with(Modify::new(Columns::first()).with(Width::wrap(20)))
         .with(Modify::new(Columns::last()).with(Width::wrap(80)))
-        .to_string();
-    println!("{table}");
+        .to_string()
 }
 
 pub fn print_dexpaprika_footer() {
@@ -126,7 +172,10 @@ pub fn print_more_results_hint(has_next_page: Option<bool>, next_cursor: Option<
     if has_next_page == Some(true) {
         match next_cursor {
             Some(c) if !c.is_empty() => {
-                println!("  More results available. next_cursor: {c}");
+                println!(
+                    "  More results available. next_cursor: {}",
+                    sanitize_line(c)
+                );
             }
             _ => println!("  More results available."),
         }
@@ -198,6 +247,39 @@ mod tests {
     #[test]
     fn format_usd_small() {
         assert_eq!(format_usd(42.5), "$42.50");
+    }
+
+    const HOSTILE: &str = "\u{1b}[2J\u{1b}[HEvil\u{1b}]0;FAKE TITLE\u{7}\u{1b}]52;c;ZXZpbA==\u{7}\u{7f}\u{9b}31m\u{202e}x";
+
+    #[test]
+    fn sanitize_for_terminal_drops_every_control_but_newline_and_tab() {
+        let clean = sanitize_for_terminal(&format!("{HOSTILE}\nline two\tcol\r"));
+        assert!(
+            !clean
+                .chars()
+                .any(|c| c != '\n' && c != '\t' && is_terminal_control(c)),
+            "{clean:?}"
+        );
+        assert!(clean.contains("Evil"));
+        assert!(clean.contains("\nline two\tcol"));
+    }
+
+    #[test]
+    fn sanitize_line_keeps_text_on_one_line() {
+        let clean = sanitize_line("a\nb\rc\td\u{1b}[1m");
+        assert_eq!(clean, "a b c d[1m");
+    }
+
+    #[test]
+    fn a_detail_table_never_carries_escape_bytes() {
+        let table = render_detail_table(vec![
+            ["Name".into(), HOSTILE.into()],
+            ["Website".into(), "\u{1b}]8;;https://evil.test\u{7}x".into()],
+        ]);
+        assert!(!table.contains('\u{1b}'), "{table:?}");
+        assert!(!table.contains('\u{7}'), "{table:?}");
+        assert!(!table.contains('\u{9b}'), "{table:?}");
+        assert!(table.contains("Evil"));
     }
 
     #[test]

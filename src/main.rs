@@ -1084,7 +1084,9 @@ async fn main() -> ExitCode {
                 println!("{}", serde_json::json!({"error": e.to_string()}));
             }
             OutputFormat::Table => {
-                eprintln!("Error: {e}");
+                // Error text can carry an API response body; keep its bytes
+                // from steering the terminal.
+                eprintln!("Error: {}", output::sanitize_for_terminal(&e.to_string()));
             }
         }
         return ExitCode::FAILURE;
