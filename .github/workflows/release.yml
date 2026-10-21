@@ -4,11 +4,14 @@ on:
   push:
     tags: ["v*"]
 
-permissions:
-  contents: write
+# Nothing by default. Each job asks for exactly what it needs: the build only
+# reads the repository, and only the job that publishes the release can write.
+permissions: {}
 
 jobs:
   build:
+    permissions:
+      contents: read
     strategy:
       matrix:
         include:
@@ -30,10 +33,14 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      # Third-party actions are pinned to full commit SHAs; the comment names
+      # the ref each SHA was taken from.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: ${{ matrix.target }}
 
@@ -42,27 +49,37 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
 
+      # --locked: ship exactly the dependency versions CI tested, never a fresh
+      # resolution made at release time.
       - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Package (unix)
         if: runner.os != 'Windows'
+        env:
+          TAG: ${{ github.ref_name }}
+          TARGET: ${{ matrix.target }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
-          cd target/${{ matrix.target }}/release
-          tar czf ../../../dexpaprika-cli-${{ github.ref_name }}-${{ matrix.platform }}.tar.gz dexpaprika-cli
+          cd "target/$TARGET/release"
+          tar czf "../../../dexpaprika-cli-$TAG-$PLATFORM.tar.gz" dexpaprika-cli
           cd ../../..
 
       - name: Package (windows)
         if: runner.os == 'Windows'
+        env:
+          TAG: ${{ github.ref_name }}
+          TARGET: ${{ matrix.target }}
+          PLATFORM: ${{ matrix.platform }}
         run: |
-          cd target/${{ matrix.target }}/release
-          7z a ../../../dexpaprika-cli-${{ github.ref_name }}-${{ matrix.platform }}.zip dexpaprika-cli.exe
+          cd "target/$env:TARGET/release"
+          7z a "../../../dexpaprika-cli-$env:TAG-$env:PLATFORM.zip" dexpaprika-cli.exe
           cd ../../..
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dexpaprika-cli-${{ matrix.platform }}
           path: dexpaprika-cli-${{ github.ref_name }}-${{ matrix.platform }}.*
@@ -70,17 +87,24 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
           merge-multiple: true
 
+      # install.sh refuses an archive whose SHA-256 is not listed here.
+      - name: Write SHA256SUMS
+        run: |
+          cd artifacts
+          sha256sum dexpaprika-cli-* > SHA256SUMS
+          cat SHA256SUMS
+
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           generate_release_notes: true
           files: artifacts/*
