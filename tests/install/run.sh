@@ -105,9 +105,12 @@ printf '%s  %s\n' "$(sha256 "$F/$ARCHIVE")" "some-other-file.tar.gz" > "$F/SHA25
 run_case no-entry refuse
 
 # 5. A correctly summed archive with a '..' member is refused before extraction.
+# -P keeps the '..': GNU tar strips it from member names otherwise, which
+# would hand install.sh a harmless archive and prove nothing.
 new_fixture dotdot
 printf 'x\n' > "$F/outside"
-(cd "$F/pack" && tar czf "$F/$ARCHIVE" "$BINARY" "../outside")
+(cd "$F/pack" && tar czPf "$F/$ARCHIVE" "$BINARY" "../outside")
+tar tzf "$F/$ARCHIVE" | grep -qx '\.\./outside' || { echo "FAIL dotdot: fixture lost its '..' member"; exit 1; }
 printf '%s  %s\n' "$(sha256 "$F/$ARCHIVE")" "$ARCHIVE" > "$F/SHA256SUMS"
 run_case dotdot refuse
 
