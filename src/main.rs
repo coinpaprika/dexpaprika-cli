@@ -198,6 +198,8 @@ enum Commands {
         #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
         price_change_5m_max: Option<f64>,
         /// Only pools created at or after this time: an offset back from now (-24h, -7d, -90m), unix timestamp, RFC3339, or yyyy-mm-dd
+        ///
+        /// Without a Dev plan or higher on api-pro.dexpaprika.com, pools created in the last hour are left out, so a window shorter than an hour comes back empty.
         #[arg(long, allow_hyphen_values = true)]
         created_after: Option<String>,
         /// Only pools created at or before this time, same formats as --created-after
@@ -541,6 +543,8 @@ enum Commands {
         #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
         price_change_24h_max: Option<f64>,
         /// Only tokens created at or after this time: an offset back from now (-24h, -7d, -90m), unix timestamp, RFC3339, or yyyy-mm-dd
+        ///
+        /// Without a Dev plan or higher on api-pro.dexpaprika.com, tokens created in the last hour are left out, so a window shorter than an hour comes back empty.
         #[arg(long, allow_hyphen_values = true)]
         created_after: Option<String>,
         /// Only tokens created at or before this time, same formats as --created-after
