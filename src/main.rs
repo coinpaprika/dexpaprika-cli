@@ -198,6 +198,8 @@ enum Commands {
         #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
         price_change_5m_max: Option<f64>,
         /// Only pools created at or after this time: an offset back from now (-24h, -7d, -90m), unix timestamp, RFC3339, or yyyy-mm-dd
+        ///
+        /// Without a Dev plan or higher on api-pro.dexpaprika.com, pools created in the last hour are left out, so a window shorter than an hour comes back empty.
         #[arg(long, allow_hyphen_values = true)]
         created_after: Option<String>,
         /// Only pools created at or before this time, same formats as --created-after
@@ -475,7 +477,7 @@ enum Commands {
     /// Get pools containing a token
     #[command(
         name = "token-pools",
-        after_help = "EXAMPLES:\n  dexpaprika-cli token-pools ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --limit 5"
+        after_help = "EXAMPLES:\n  dexpaprika-cli token-pools ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --limit 5\n\nWithout a Dev plan or higher on api-pro.dexpaprika.com, pools created in the last hour are left out, so a token launched in the last hour shows no pools yet."
     )]
     TokenPools {
         /// Network ID
@@ -541,6 +543,8 @@ enum Commands {
         #[arg(long, allow_negative_numbers = true, value_parser = finite_percent)]
         price_change_24h_max: Option<f64>,
         /// Only tokens created at or after this time: an offset back from now (-24h, -7d, -90m), unix timestamp, RFC3339, or yyyy-mm-dd
+        ///
+        /// Without a Dev plan or higher on api-pro.dexpaprika.com, tokens created in the last hour are left out, so a window shorter than an hour comes back empty.
         #[arg(long, allow_hyphen_values = true)]
         created_after: Option<String>,
         /// Only tokens created at or before this time, same formats as --created-after

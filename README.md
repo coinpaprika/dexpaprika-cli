@@ -217,6 +217,8 @@ dexpaprika-cli transactions ethereum 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 
 dexpaprika-cli pool-filter solana --created-after -24h --sort-by created_at
 ```
 
+Without a Dev plan or higher, `pools`, `dex-pools`, `token-pools`, `pool-filter`, `top-tokens` and `filter-tokens` leave out pools and tokens created in the last hour, so a `--created-after` window shorter than an hour, or the pools of a token launched in the last hour, come back empty. `pool` and `token` answer at any age. Dev, Pro and Enterprise keys on `api-pro.dexpaprika.com` see them as they're indexed. Details: https://docs.dexpaprika.com/knowledge-base/rate-limits#search-freshness
+
 ## Streaming
 
 SSE price feeds. Updates are swap-driven, pushed when a swap moves the price, not on a fixed cadence and not per block.
