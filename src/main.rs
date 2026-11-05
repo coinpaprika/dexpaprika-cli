@@ -477,7 +477,7 @@ enum Commands {
     /// Get pools containing a token
     #[command(
         name = "token-pools",
-        after_help = "EXAMPLES:\n  dexpaprika-cli token-pools ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --limit 5"
+        after_help = "EXAMPLES:\n  dexpaprika-cli token-pools ethereum 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2 --limit 5\n\nWithout a Dev plan or higher on api-pro.dexpaprika.com, pools created in the last hour are left out, so a token launched in the last hour shows no pools yet."
     )]
     TokenPools {
         /// Network ID
