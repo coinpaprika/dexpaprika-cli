@@ -346,6 +346,19 @@ pub async fn execute_prices(
 /// 24h is the only window tokens carry. The 48h, 6h, 1h and 5m bounds that
 /// `pool-filter` takes are deliberately absent: token rows have no such fields,
 /// and ordering tokens by any of the four is a `400`.
+fn token_fdv_params(min: Option<f64>, max: Option<f64>) -> Vec<(&'static str, String)> {
+    // The API names are fdv_usd_min/fdv_usd_max. fdv_min/fdv_max are ignored
+    // today and answer 400 from 23 November 2026.
+    let mut params = Vec::new();
+    if let Some(v) = min {
+        params.push(("fdv_usd_min", v.to_string()));
+    }
+    if let Some(v) = max {
+        params.push(("fdv_usd_max", v.to_string()));
+    }
+    params
+}
+
 fn token_price_change_params(min: Option<f64>, max: Option<f64>) -> Vec<(&'static str, String)> {
     let mut params = Vec::new();
     if let Some(v) = min {
@@ -398,12 +411,7 @@ pub async fn execute_filter_tokens(
     if let Some(v) = liquidity_usd_min {
         params.push(("liquidity_usd_min", v.to_string()));
     }
-    if let Some(v) = fdv_min {
-        params.push(("fdv_min", v.to_string()));
-    }
-    if let Some(v) = fdv_max {
-        params.push(("fdv_max", v.to_string()));
-    }
+    params.extend(token_fdv_params(fdv_min, fdv_max));
     params.extend(token_price_change_params(
         price_change_24h_min,
         price_change_24h_max,
@@ -466,6 +474,20 @@ mod tests {
                 ("price_change_percentage_24h_max", "-20"),
             ]
         );
+    }
+
+    /// Checked against api.dexpaprika.com on 2026-11-16: fdv_usd_min=1e12
+    /// returned only tokens above it and was echoed in `query`; fdv_min was
+    /// dropped from the echo and filtered nothing.
+    #[test]
+    fn token_fdv_params_carry_the_names_the_api_expects() {
+        let params = token_fdv_params(Some(1000000.0), Some(5.5));
+        let pairs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+        assert_eq!(
+            pairs,
+            vec![("fdv_usd_min", "1000000"), ("fdv_usd_max", "5.5")]
+        );
+        assert!(token_fdv_params(None, None).is_empty());
     }
 
     #[test]
