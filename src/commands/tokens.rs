@@ -483,7 +483,10 @@ mod tests {
     fn token_fdv_params_carry_the_names_the_api_expects() {
         let params = token_fdv_params(Some(1000000.0), Some(5.5));
         let pairs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
-        assert_eq!(pairs, vec![("fdv_usd_min", "1000000"), ("fdv_usd_max", "5.5")]);
+        assert_eq!(
+            pairs,
+            vec![("fdv_usd_min", "1000000"), ("fdv_usd_max", "5.5")]
+        );
         assert!(token_fdv_params(None, None).is_empty());
     }
 
