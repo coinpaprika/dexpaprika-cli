@@ -32,7 +32,7 @@ Need higher limits or SLA? Contact support@coinpaprika.com
 
 ## Optional API key
 
-**The CLI works without a key.** Nothing above needs one.
+**The CLI works without a key.** Nothing above needs one. The one exception is `prices`, which needs an API key; a free key from [console.dexpaprika.com](https://console.dexpaprika.com) is enough, on the same default host.
 
 A free key raises both the credit allowance and the per-minute limit: keyless
 runs at 15 requests a minute and a registered key at 30. Reach for one when you
@@ -92,7 +92,7 @@ directory.
 | `token-ohlcv` | Token OHLCV data (Dev or Pro plan) | `dexpaprika-cli token-ohlcv ethereum 0xc02a... --start -24h --interval 1h` |
 | `token-indicator` | Technical indicator for a token (Dev or Pro plan) | `dexpaprika-cli token-indicator ethereum 0xc02a... --indicator rsi --interval 1h` |
 | `token-pools` | Pools containing a token | `dexpaprika-cli token-pools ethereum 0xc02a...` |
-| `prices` | Batch token prices | `dexpaprika-cli prices ethereum --tokens 0xc02a...,0xdac1...` |
+| `prices` | Batch token prices (needs an API key; a free key works) | `dexpaprika-cli prices ethereum --tokens 0xc02a...,0xdac1...` |
 | `search` | Search everything | `dexpaprika-cli search uniswap` |
 | `stream` | SSE token price stream | `dexpaprika-cli stream ethereum 0xc02a...` |
 | `stream-reserves` | SSE pool/token reserve stream | `dexpaprika-cli stream-reserves ethereum 0x88e6... --method pool_reserves` |
