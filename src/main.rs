@@ -574,9 +574,9 @@ enum Commands {
         sort: String,
     },
 
-    /// Get batch prices for multiple tokens
+    /// Get batch prices for multiple tokens. Needs an API key (a free key works)
     #[command(
-        after_help = "EXAMPLES:\n  dexpaprika-cli prices ethereum --tokens 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2,0xdac17f958d2ee523a2206206994597c13d831ec7"
+        after_help = "EXAMPLES:\n  dexpaprika-cli prices ethereum --tokens 0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2,0xdac17f958d2ee523a2206206994597c13d831ec7\n\nPLAN:\n  Needs an API key. A free key is enough, on the default host https://api.dexpaprika.com.\n  Without a key the API answers 403. Get a free key at https://console.dexpaprika.com, then run\n  `dexpaprika-cli config set-key` (it prompts for the key) or set DEXPAPRIKA_API_KEY.\n  Plans: https://dexpaprika.com/api/pricing"
     )]
     Prices {
         /// Network ID
